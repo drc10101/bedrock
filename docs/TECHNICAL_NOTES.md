@@ -282,8 +282,9 @@ Each level is deterministic: same master key + same info string = same derived k
 | Certificates | 30 | Passing |
 | Audit Chain | 41 | Passing |
 | Access Control | 51 | Passing |
+| Transport Security | 41 | Passing |
 | Core | 25 | Passing |
-| **Total** | **355** | **All passing** |
+| **Total** | **396** | **All passing** |
 
 ---
 
@@ -537,14 +538,57 @@ A VIEWER cannot authenticate to the admin portal at all — structurally enforce
 
 ---
 
+## B-110: Transport Security
+
+**What:** TLS termination configuration, downgrade attack detection, per-node/IP rate limiting, and connection lifecycle management. The transport layer wraps the encryption engine's E2EE functionality and ensures the channel is safe before data is exchanged.
+
+**Why:** Without transport security, even E2EE-encrypted data can be intercepted through downgrade attacks (forcing TLS 1.0/1.1), DDoS attacks (overwhelming a node with requests), or connection hijacking. The transport layer enforces minimum TLS versions, detects downgrade attempts, and throttles abuse before it reaches the encryption engine.
+
+**Components:**
+
+### TLSConfig
+- Minimum version enforcement: TLS 1.3 for production, TLS 1.2 for developer mode
+- `is_developer_mode()`: TLS 1.2 + no CA cert = dev mode (self-signed)
+- `is_production_mode()`: TLS 1.3 + CA cert = production mode
+- Client certificate verification, server cipher preference
+- 5-minute session timeout, max 10 concurrent sessions per client
+
+### DowngradeStatus (enum)
+- SECURE: Connection meets TLS requirements
+- DOWNGRADE: Downgrade attack detected (TLS version below minimum, or HTTP instead of HTTPS)
+- UNKNOWN: Cannot determine TLS version
+
+### RateLimitConfig / RateLimiter
+- Sliding window algorithm (1-minute and 1-hour windows)
+- Burst size: short bursts allowed, sustained over-rate throttled
+- Violation tracking: 5 violations = 15-minute block
+- Per-key (node ID or IP address) independent limits
+- `reset()`: admin action to clear rate limits for a key
+- `get_status()`: inspect current limits and violation counts
+
+### ConnectionInfo / TransportLayer
+- Connection registration with TLS version and E2EE tracking
+- Activity metrics (bytes sent/received, last activity timestamp)
+- Connection limit (default 1000 per transport instance)
+- Per-node filtering for active connections
+- Full lifecycle: register → activity updates → close
+
+### Downgrade detection
+- Checks X-Forwarded-Proto header (HTTP = downgrade)
+- Checks X-TLS-Version header (below minimum = downgrade)
+- Handles TLSv1.2, TLSv1.3, 1.2, 1.3 formats
+- Production mode: missing TLS version headers = UNKNOWN (suspicious)
+- Developer mode: TLS 1.2 accepted as SECURE
+
+---
+
 ## Remaining Work (Phase 1)
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-110 | Transport Security | TLS termination, E2EE delivery, rate limiting |
 | B-111 | Self-Healing Mesh | Attack detection, node isolation, automatic rerouting |
 | B-112 | Core Integration Tests | End-to-end cross-component tests |
 
 ---
 
-*Last updated: B-109 complete, 355 tests passing*
+*Last updated: B-110 complete, 396 tests passing*
