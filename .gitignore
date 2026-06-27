@@ -22,6 +22,10 @@ dist/
 build/
 *.egg-info/
 
+# Test coverage
+coverage/
+.nyc_output/
+
 # IDE
 .vscode/
 .idea/
