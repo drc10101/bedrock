@@ -874,9 +874,10 @@ Files created:
 | Healthcare Template | 38 | All passing |
 | Banking Template | 43 | All passing |
 | Investment Template | 45 | All passing |
-| **Total** | **710** | **All passing** |
+| Defense Template | 48 | All passing |
+| **Total** | **758** | **All passing** |
 
-*Last updated: B-303 complete, 710 total tests passing*
+*Last updated: B-304 complete, 758 total tests passing*
 
 ---
 
@@ -958,3 +959,35 @@ Investment-specific design decisions:
 - Regulator role: read-only, no write access
 
 Files: `templates/investment/__init__.py`, `templates/investment/test_investment.py`
+
+---
+
+## B-304: Defense Vertical Template
+
+**Status:** Complete
+
+Pre-configured defense vertical for CMMC/DFARS compliance. Provides:
+
+1. **Silo definitions** — identity (clearance/KYC), cui (CUI per 32 CFR 2002),
+   auth (credentials/access logs/incident reports)
+2. **Consent flows** — clearance_verification, cui_access, export_review,
+   audit_review with CMMC/NIST 800-171 section mappings
+3. **Role-portal mappings** — cleared_staff, program_manager, fso,
+   subcontractor, auditor with clearance-level gating
+4. **Clearance level system** — public(0), cui(1), secret(2), top_secret(3),
+   top_secret_sci(4) with `check_clearance()` method
+5. **CMMC/DFARS compliance report** — Maps CMMC Level 2 practices, DFARS
+   252.204-7012, and NIST 800-171 to Bedrock enforcement
+6. **CoreConfig presets** — 6-year audit, 30-min sessions, 3-attempt lockout,
+   need-to-know consent (reason always required)
+
+Defense-specific design decisions:
+- Clearance levels gate every consent flow (need-to-know basis)
+- CUI silo uses separate HKDF prefix (`bedrock:silo:defense:cui:v1`)
+- Export review requires minimum Secret clearance (ITAR/EAR)
+- FSO role has Top Secret clearance + cert issue/revoke
+- 72-hour breach notification per DFARS 7012(c)
+- Flow-down enforcement for subcontractors per DFARS 7012(d)
+- All consent flows require reason (no exceptions — need-to-know)
+
+Files: `templates/defense/__init__.py`, `templates/defense/test_defense.py`
