@@ -1270,3 +1270,64 @@ Files:
 - `core/bedrock/licensing/enforcement.py` (enum identity robustness fix)
 
 **Test count:** 660 total (538 Python + 122 TypeScript), all passing.
+
+---
+
+## B-312: Key Rotation Implementation
+
+**Status:** Complete
+
+Implemented master key rotation lifecycle with grace periods, emergency revocation,
+re-encryption, and audit trail.
+
+New module: `bedrock.key_management.rotation`
+
+Classes:
+1. **RotationPolicy** — Configurable rotation schedule:
+   - `rotation_interval_days` (default 90): automatic rotation interval
+   - `grace_period_days` (default 30): old keys stay decryptable
+   - `emergency_grace_days` (default 7): shorter grace after emergency rotation
+   - `max_grace_keys` (default 3): max simultaneous grace-period keys
+   - `auto_rotate` (default True): enable scheduled rotation
+
+2. **KeyRotationManager** — Master key rotation lifecycle:
+   - `rotate_master_key(trigger, new_key)`: generate or accept new master key, move old to grace
+   - `revoke_key(key_id)`: emergency revocation, destroys key material immediately
+   - `re_encrypt_field(field_encryptor, ciphertext, ...)`: migrate data to new key
+     - With explicit `old_master_key`: direct decrypt/re-encrypt
+     - Without: tries all grace keys automatically
+   - `is_rotation_due()`: check if scheduled rotation is overdue
+   - `get_grace_keys()`: list keys available for decryption
+   - `retire_expired_keys()`: auto-retire grace keys past their period
+   - `get_rotation_history()`: full audit log of every rotation event
+   - `get_key_records()`: lifecycle records (ACTIVE -> GRACE -> RETIRED/REVOKED)
+
+3. **RotationTrigger** — Why a rotation happened: SCHEDULED, MANUAL, EMERGENCY, COMPLIANCE
+
+4. **KeyState** — Lifecycle states: ACTIVE, GRACE, RETIRED, REVOKED
+
+5. **MasterKeyRecord** — Per-key metadata: key_id, version, state, timestamps, trigger, predecessor
+
+Key design decisions:
+- Lazy import for `FieldEncryptor` to avoid circular dependency (encryption.engine <-> key_management.rotation)
+- Grace keys stored in memory (not persisted) — production would use HSM/vault
+- Re-encryption supports both explicit old key and automatic grace-key discovery
+- Silo key cache is cleared on master key rotation (all derived keys must be re-derived)
+
+Tests (30 new):
+- RotationPolicy defaults and custom config (2)
+- Master key rotation: new key generation, grace period, cache clearing, max limit (6)
+- Emergency/compliance rotation triggers (3)
+- Key revocation and active key protection (2)
+- Grace period expiry and decryptability (2)
+- Re-encryption: single field, data preservation, multi-rotation, grace-key-only (4)
+- Scheduled rotation: due check, disabled, interval elapsed, audit log (4)
+- Key lifecycle records: initial, multi-rotation, predecessor chain, state transitions (4)
+- Silo key rotation: independent of master, cache invalidation, cross-key derivation (3)
+
+Files:
+- `core/bedrock/key_management/rotation.py` (438 lines, new module)
+- `core/bedrock/key_management/__init__.py` (updated exports)
+- `tests/test_key_rotation.py` (357 lines, 30 tests)
+
+**Test count:** 690 total (568 Python + 122 TypeScript), all passing.
