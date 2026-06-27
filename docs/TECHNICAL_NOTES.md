@@ -1331,3 +1331,62 @@ Files:
 - `tests/test_key_rotation.py` (357 lines, 30 tests)
 
 **Test count:** 690 total (568 Python + 122 TypeScript), all passing.
+
+---
+
+## B-313: Performance/Load Testing
+
+**Status:** Complete
+
+Created comprehensive performance benchmark suite establishing baseline throughput
+and latency numbers for all critical-path Bedrock Core operations.
+
+Also fixed enum identity robustness in `certificates.py` — `NODE_LIMITS` dict now
+has string-key fallbacks and bracket lookups use `.get()` with `.value` fallback,
+matching the fix pattern from B-311's `enforcement.py`.
+
+Test suites (19 tests across 8 classes):
+
+1. **TestEncryptionPerformance** (4 tests):
+   - Encrypt throughput: 500 ops, min 100 ops/s, P99 < 100ms
+   - Decrypt throughput: 500 ops, min 100 ops/s, P99 < 100ms
+   - Encrypt-decrypt roundtrip: 500 ops, min 50 ops/s
+   - Multi-silo: 10 silos x 200 ops each, avg < 5s per silo
+
+2. **TestKeyDerivationPerformance** (2 tests):
+   - Silo key derivation: 100 unique keys, min 50 ops/s
+   - Cached silo key derivation: 1000 ops, min 500 ops/s
+
+3. **TestConsentPerformance** (2 tests):
+   - Consent request creation: 200 ops, min 50 ops/s
+   - Consent approval: 200 ops, min 50 ops/s
+
+4. **TestAuditPerformance** (3 tests):
+   - Audit append: 500 ops, min 100 ops/s
+   - Audit verify under load: verify after 1000 appends, mean < 500ms
+   - Audit query: 200 queries against 500 entries, min 50 ops/s
+
+5. **TestLicensingPerformance** (2 tests):
+   - License generation: 200 ops, min 50 ops/s
+   - License validation: 500 ops, min 100 ops/s
+
+6. **TestNodeRegistrationPerformance** (2 tests):
+   - Bulk registration: 100 nodes in < 2s
+   - Certificate issuance: 100 certs (enterprise tier), min 10 ops/s
+
+7. **TestKeyRotationPerformance** (2 tests):
+   - Master key rotation: 20 rotations, min 5 ops/s
+   - Re-encryption: 100 fields, < 5s total
+
+8. **TestE2EEPerformance** (1 test):
+   - E2EE encrypt-decrypt roundtrip: 100 ops, min 10 ops/s
+
+9. **TestConcurrentOperations** (1 test):
+   - Mixed workload: 100 ops (encrypt, consent, audit, license), < 10s
+   - Verifies audit chain integrity after load
+
+Files:
+- `tests/test_performance.py` (408 lines, 19 tests)
+- `core/bedrock/identity/certificates.py` (NODE_LIMITS enum robustness fix)
+
+**Test count:** 709 total (587 Python + 122 TypeScript), all passing.

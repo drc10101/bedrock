@@ -53,6 +53,9 @@ NODE_LIMITS = {
     LicenseTier.BUSINESS: 25,
     LicenseTier.ENTERPRISE: float("inf"),  # Unlimited
 }
+# String-key fallbacks for enum identity robustness under pytest
+for _tier in list(NODE_LIMITS):
+    NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
 
 
 @dataclass
@@ -168,7 +171,7 @@ class CertificateManager:
         # Enforce license limit
         if not self.check_license_limit():
             active_count = self._count_active_certs()
-            limit = NODE_LIMITS[self.license_tier]
+            limit = NODE_LIMITS.get(self.license_tier) or NODE_LIMITS.get(self.license_tier.value, 3)
             raise LicenseExceededError(
                 f"License limit reached: {active_count} active certificates, "
                 f"limit is {limit} for {self.license_tier.value} tier. "
@@ -310,7 +313,7 @@ class CertificateManager:
         Returns True if under limit, False if at or over limit.
         """
         active_count = self._count_active_certs()
-        limit = NODE_LIMITS[self.license_tier]
+        limit = NODE_LIMITS.get(self.license_tier) or NODE_LIMITS.get(self.license_tier.value, 3)
         return active_count < limit
 
     def get_crl(self) -> Set[str]:
