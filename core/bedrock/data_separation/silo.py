@@ -67,7 +67,8 @@ class SiloManager:
     def create_silo(self, name: str, display_name: str,
                     categories: Optional[List[str]] = None,
                     description: str = "",
-                    encrypted: bool = True) -> Silo:
+                    encrypted: bool = True,
+                    hkdf_info: Optional[str] = None) -> Silo:
         """Create a new data silo.
 
         Args:
@@ -76,6 +77,7 @@ class SiloManager:
             categories: Data categories within this silo
             description: What this silo stores
             encrypted: Whether data in this silo is encrypted (default True)
+            hkdf_info: Custom HKDF info string (default: bedrock:silo:{name}:v1)
 
         Returns:
             The created Silo
@@ -86,11 +88,11 @@ class SiloManager:
         if name in self._silos:
             raise ValueError(f"Silo '{name}' already exists")
 
-        hkdf_info = f"bedrock:silo:{name}:v1"
+        info = hkdf_info or f"bedrock:silo:{name}:v1"
         silo = Silo(
             name=name,
             display_name=display_name,
-            hkdf_info=hkdf_info,
+            hkdf_info=info,
             encrypted=encrypted,
             categories=categories or [],
             description=description,

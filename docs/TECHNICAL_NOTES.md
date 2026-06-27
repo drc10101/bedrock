@@ -871,6 +871,33 @@ Files created:
 | TypeScript SDK | 52 | All passing |
 | Integration (Python) | 16 | All passing |
 | Integration (TypeScript) | 16 | All passing |
-| **Total** | **584** | **All passing** |
+| Healthcare Template | 38 | All passing |
+| **Total** | **622** | **All passing** |
 
-*Last updated: B-216 complete, 584 total tests passing*
+*Last updated: B-301 complete, 622 total tests passing*
+
+---
+
+## B-301: Healthcare Vertical Template
+
+**Status:** Complete
+
+Pre-configured healthcare vertical extracted from InFill's proven PIR/ePRR
+patterns. Provides:
+
+1. **Silo definitions** — identity (PII), medical (PHI), auth (credentials)
+   with HIPAA-specific HKDF info strings and category isolation
+2. **Consent flows** — PIR, ePRR, treatment, research, insurance with
+   HIPAA section mappings and TTL defaults
+3. **Role-portal mappings** — provider, patient, admin, researcher, insurer
+   with minimum necessary standard enforcement
+4. **HIPAA compliance report** — Maps 45 CFR Parts 160/164 sections to
+   Bedrock enforcement mechanisms (encryption, consent, audit, RBAC)
+5. **CoreConfig presets** — Production HIPAA configuration with 6-year
+   audit retention, strict consent, MFA required, session timeouts
+
+Core change: `SiloManager.create_silo()` now accepts optional `hkdf_info`
+parameter for vertical-specific key derivation prefixes (e.g.
+`bedrock:silo:healthcare:identity:v1`).
+
+Files: `templates/healthcare/__init__.py`, `templates/healthcare/test_healthcare.py`
