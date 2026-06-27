@@ -877,7 +877,7 @@ Files created:
 | Defense Template | 48 | All passing |
 | **Total** | **758** | **All passing** |
 
-*Last updated: B-305 complete, 758 total tests passing*
+*Last updated: B-306 complete, 758 total tests passing*
 
 ---
 
@@ -1032,4 +1032,48 @@ Files:
 - `docs/developer-portal/tutorials/healthcare-tutorial.md`
 - `docs/developer-portal/tutorials/banking-tutorial.md`
 - `docs/developer-portal/tutorials/investment-tutorial.md`
+
+---
+
+## B-306: Compliance Kits
+
+**Status:** Complete
+
+Regulation-to-enforcement mapping documents for 5 compliance frameworks:
+
+1. **HIPAA Compliance Kit** (45 CFR 160/164) — Maps Privacy Rule, Security Rule,
+   and Breach Notification Rule to Bedrock enforcement. 30+ requirement-to-module
+   mappings covering access control, encryption, audit, integrity, authentication,
+   and transmission security.
+
+2. **PCI-DSS v4.0 Compliance Kit** — Maps all 12 PCI-DSS requirements to Bedrock
+   enforcement. PAN isolation architecture diagram, minimum-necessary role matrix,
+   key management mapping, and audit trail requirements table.
+
+3. **SOC 2 Type II Compliance Kit** — Maps all 5 Trust Services Criteria (CC6-CC10)
+   to Bedrock modules. Includes evidence collection guidance and automated
+   evidence generation code.
+
+4. **GLBA Compliance Kit** (15 USC 6801-6809) — Maps Privacy Rule and Safeguards
+   Rule to Bedrock enforcement. NPI isolation architecture for Banking and
+   Investment templates.
+
+5. **DFARS/CMMC/NIST 800-171 Compliance Kit** — Maps DFARS 252.204-7012
+   (7012(b)(c)(d)), CMMC Level 2 practices (AC, AU, CM, IA, MP, SC), and
+   NIST 800-171 controls (3.1, 3.3, 3.5, 3.10, 3.13) to Bedrock enforcement.
+   Includes clearance-gated consent flow table and 5-level clearance hierarchy.
+
+All kits include:
+- Module-level enforcement mapping tables
+- Cross-reference between regulations
+- Evidence collection guidance
+- Quick reference: regulatory coverage matrix
+
+Files:
+- `docs/compliance/README.md`
+- `docs/compliance/hipaa-compliance-kit.md`
+- `docs/compliance/pci-dss-compliance-kit.md`
+- `docs/compliance/soc2-compliance-kit.md`
+- `docs/compliance/glba-compliance-kit.md`
+- `docs/compliance/dfars-cmmc-compliance-kit.md`
 - `docs/developer-portal/tutorials/defense-tutorial.md`
