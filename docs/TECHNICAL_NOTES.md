@@ -873,9 +873,10 @@ Files created:
 | Integration (TypeScript) | 16 | All passing |
 | Healthcare Template | 38 | All passing |
 | Banking Template | 43 | All passing |
-| **Total** | **665** | **All passing** |
+| Investment Template | 45 | All passing |
+| **Total** | **710** | **All passing** |
 
-*Last updated: B-302 complete, 665 total tests passing*
+*Last updated: B-303 complete, 710 total tests passing*
 
 ---
 
@@ -929,3 +930,31 @@ Banking template follows same architecture as healthcare but with:
 - PCI-DSS 3.4 PAN isolation in transactions silo only
 
 Files: `templates/banking/__init__.py`, `templates/banking/test_banking.py`
+
+---
+
+## B-303: Investment Vertical Template
+
+**Status:** Complete
+
+Pre-configured investment vertical for SEC/FINRA compliance. Provides:
+
+1. **Silo definitions** — identity (PII/KYC/accreditation), portfolio
+   (holdings/orders/margin), auth (credentials/trade surveillance)
+2. **Consent flows** — account_opening, trade_execution, advisory,
+   audit_review, third_party_sharing with SEC/FINRA section mappings
+3. **Role-portal mappings** — client, advisor, trader, compliance, regulator
+   with SEC minimum necessary standard enforcement
+4. **SEC/FINRA compliance report** — Maps Reg S-P, Reg BI, FINRA Rules,
+   SEC 17a-4, AML/BSA to Bedrock enforcement mechanisms
+5. **CoreConfig presets** — 6-year audit retention (SEC 17a-4), 30-min sessions,
+   MFA required, 5-min trade execution TTL
+
+Investment-specific design decisions:
+- Trade execution TTL: 5 minutes (shortest, for order security)
+- Accreditation and beneficial ownership in identity silo (KYC/AML)
+- Trade surveillance and compliance alerts in auth silo (FINRA 3110)
+- 6-year audit retention (SEC 17a-4 requires 5-6 years)
+- Regulator role: read-only, no write access
+
+Files: `templates/investment/__init__.py`, `templates/investment/test_investment.py`
