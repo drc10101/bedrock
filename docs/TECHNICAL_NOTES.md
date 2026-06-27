@@ -283,8 +283,9 @@ Each level is deterministic: same master key + same info string = same derived k
 | Audit Chain | 41 | Passing |
 | Access Control | 51 | Passing |
 | Transport Security | 41 | Passing |
+| Self-Healing Mesh | 46 | Passing |
 | Core | 25 | Passing |
-| **Total** | **396** | **All passing** |
+| **Total** | **442** | **All passing** |
 
 ---
 
@@ -591,4 +592,54 @@ A VIEWER cannot authenticate to the admin portal at all — structurally enforce
 
 ---
 
-*Last updated: B-110 complete, 396 tests passing*
+## B-111: Self-Healing Mesh
+
+**Status:** Complete
+
+Implemented the full Self-Healing Mesh — distributed attack detection, consensus-based
+node isolation, automatic rerouting, healing protocol, and node state machine.
+
+### Files
+
+- `core/bedrock/mesh/state_machine.py` (149 lines) — NodeStateMachine with 5-state lifecycle
+  (ACTIVE → SUSPECT → QUARANTINED → HEALING → ACTIVE; REVOKED is terminal). Transition
+  validation, history tracking, `can_promote_to_active()` for healing completion.
+- `core/bedrock/mesh/detector.py` (148 lines) — AttackDetector with `node_id` source binding,
+  8 signal types (SILENT_NODE, UNUSUAL_VOLUME, CREDENTIAL_STUFFING, DATA_EXFILTRATION,
+  MAN_IN_THE_MIDDLE, REPLAY_ATTACK, TAMPERING, PORT_SCAN), `should_isolate()` for
+  consensus checks, `clear_signals()` for healing.
+- `core/bedrock/mesh/router.py` (234 lines) — MeshRouter with capability-scope-aware path
+  calculation. Medical-scope nodes never relay transaction data. BFS pathfinding,
+  quarantine-aware routing (skips QUARANTINED/REVOKED nodes), `find_alternate_path()`,
+  redundancy verification.
+- `core/bedrock/mesh/healing.py` (295 lines) — SelfHealingMesh orchestrator. Coordinates
+  detector, state machine, and router. Node registration/unregistration, flag processing
+  with consensus thresholds, `begin_healing()` / `complete_healing()` lifecycle,
+  `reroute()` with scope filtering, `revoke_node()` for admin override.
+- `core/bedrock/mesh/__init__.py` (24 lines) — Updated exports
+
+### Key Design Decisions
+
+- **Node state lifecycle:** ACTIVE → SUSPECT → QUARANTINED → HEALING → ACTIVE. REVOKED is
+  terminal (no return). Admin can force-revoke any node at any state.
+- **Consensus threshold:** Default 2 unique flags required. Single flag = suspicious but
+  not actionable. Two independent observers = consensus.
+- **Capability-scope routing:** Each node declares data categories (IDENTITY, MEDICAL,
+  FINANCIAL, etc.). Routes only traverse nodes with compatible categories. Medical-scope
+  nodes never relay transaction data.
+- **Healing protocol:** QUARANTINED → HEALING → ACTIVE requires re-attestation. Healing
+  can fail and roll back to QUARANTINED.
+- **UUID-based node keys:** Mesh stores nodes by `node_id.uuid` string (NodeID is not
+  hashable as a dataclass). All mesh operations use UUID strings as identifiers.
+
+### Tests: 46 passing
+
+- 17 MeshStateMachine tests (all valid/invalid transitions, history, promotion)
+- 8 AttackDetector tests (signal detection, consensus, clearing)
+- 12 MeshRouter tests (pathfinding, quarantine bypass, scope filtering, redundancy)
+- 9 SelfHealingMesh integration tests (registration, flagging, consensus, lifecycle,
+  rerouting, revocation, healing)
+
+---
+
+*Last updated: B-111 complete, 442 tests passing*

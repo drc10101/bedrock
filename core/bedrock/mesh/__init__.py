@@ -11,12 +11,14 @@ Quarantined nodes can heal through re-attestation.
 Trade Secret — InFill Systems, LLC.
 """
 
-from bedrock.mesh.detector import AttackDetector
-from bedrock.mesh.state_machine import MeshStateMachine
+from bedrock.mesh.detector import AttackDetector, DetectionSignal, SignalType
+from bedrock.mesh.state_machine import MeshStateMachine, TransitionRecord
 from bedrock.mesh.router import MeshRouter
+from bedrock.mesh.healing import SelfHealingMesh, HealingResult
 
 __all__ = [
-    "AttackDetector",
-    "MeshStateMachine",
+    "AttackDetector", "DetectionSignal", "SignalType",
+    "MeshStateMachine", "TransitionRecord",
     "MeshRouter",
+    "SelfHealingMesh", "HealingResult",
 ]
