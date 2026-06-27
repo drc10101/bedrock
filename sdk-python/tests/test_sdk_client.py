@@ -25,6 +25,7 @@ import sys
 sys.path.insert(0, "core")
 
 from bedrock.server import create_server
+from bedrock.server.tls import TLSConfig
 from bedrock.config import CoreConfig
 
 
@@ -51,6 +52,7 @@ class _TestServer:
             port=self.port,
             config=config,
             api_keys=api_keys,
+            tls_config=TLSConfig(enabled=False),  # No TLS for test client
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()

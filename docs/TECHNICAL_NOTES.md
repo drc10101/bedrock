@@ -1660,3 +1660,50 @@ Tables: bedrock_nodes, bedrock_certificates, bedrock_silos,
 bedrock_consents, bedrock_audit, bedrock_licenses
 
 **Test count:** 851 total (709 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-320: HTTPS/TLS Termination
+
+**Status:** Complete
+
+TLS termination layer for the Bedrock API server. Production uses CA-signed
+certs. Developer mode auto-generates self-signed certs.
+
+New modules:
+- `core/bedrock/server/tls.py` — TLS configuration, cert generation, SSL
+  context creation, server wrapping
+- `core/bedrock/server/app.py` — API server (moved from server.py to server/
+  package)
+- `core/bedrock/server/__init__.py` — re-exports
+
+TLSConfig:
+- `for_development()` — auto-generates self-signed certs (RSA 2048, SAN
+  includes localhost, 127.0.0.1, ::1)
+- `for_production()` — requires existing CA-signed cert/key files
+- `from_env()` — loads from BEDROCK_TLS_CERT, BEDROCK_TLS_KEY, etc.
+- Minimum TLS 1.2, maximum TLS 1.3
+- Secure cipher suites only (ECDHE+GCM, CHACHA20)
+- mTLS support (verify_client + client_ca_file)
+
+Self-signed cert generation:
+- `generate_self_signed_cert()` — uses openssl subprocess
+- `generate_self_signed_cert_python()` — uses cryptography library (fallback)
+- Both generate PEM cert + key with SAN extensions
+
+Security hardening:
+- TLS 1.2+ minimum (TLS 1.0/1.1 rejected)
+- Compression disabled (CRIME attack prevention)
+- Single DH/ECDH use per handshake
+- No weak ciphers (RC4, 3DES, EXPORT excluded)
+
+Server integration:
+- `create_server()` accepts optional `tls_config` parameter
+- Auto-configures TLS in development mode (self-signed)
+- Auto-configures TLS in production mode (from env vars)
+- Pass `TLSConfig(enabled=False)` to disable TLS for testing
+
+Breaking change: `bedrock.server` is now a package, not a module.
+All imports (`from bedrock.server import ...`) still work via __init__.py.
+
+**Test count:** 872 total (730 Python + 20 SDK + 122 TypeScript), all passing.

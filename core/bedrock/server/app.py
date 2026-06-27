@@ -22,6 +22,7 @@ from urllib.parse import urlparse, parse_qs
 
 from bedrock.config import CoreConfig
 from bedrock.health import HealthChecker
+from bedrock.server.tls import TLSConfig, create_ssl_context, wrap_server_with_tls
 
 
 class APIError(Exception):
@@ -461,23 +462,56 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
 def create_server(host: str = "0.0.0.0", port: int = 8443,
                   config: Optional[CoreConfig] = None,
-                  api_keys: Optional[Dict[str, dict]] = None) -> HTTPServer:
-    """Create and configure the Bedrock Core API server."""
+                  api_keys: Optional[Dict[str, dict]] = None,
+                  tls_config: Optional[TLSConfig] = None) -> HTTPServer:
+    """Create and configure the Bedrock Core API server.
+
+    Args:
+        host: Bind address.
+        port: Bind port.
+        config: Core configuration (loaded from env if not provided).
+        api_keys: Dict of api_key -> {tier, node_id, roles}.
+        tls_config: TLS configuration. If None, auto-configured:
+            - Development: generates self-signed certs
+            - Production: requires BEDROCK_TLS_CERT and BEDROCK_TLS_KEY env vars
+    """
     BedrockAPIHandler.config = config or CoreConfig.from_env()
     BedrockAPIHandler.api_keys = api_keys or {}
 
     server = HTTPServer((host, port), BedrockAPIHandler)
+
+    # Apply TLS if configured
+    if tls_config is None:
+        # Auto-configure: dev mode gets self-signed, prod requires env vars
+        effective_config = BedrockAPIHandler.config
+        if effective_config.environment == "development":
+            tls_config = TLSConfig.for_development()
+        else:
+            tls_config = TLSConfig.from_env()
+
+    if tls_config and tls_config.enabled:
+        wrap_server_with_tls(server, tls_config)
+        scheme = "https"
+    else:
+        scheme = "http"
+
+    print(f"Bedrock Core API server created on {scheme}://{host}:{port}")
+    print(f"TLS: {'enabled' if (tls_config and tls_config.enabled) else 'disabled'}")
+    if tls_config and tls_config.enabled:
+        print(f"TLS version: {tls_config.min_version.name} - {tls_config.max_version.name}")
+
     return server
 
 
 def run_server(host: str = "0.0.0.0", port: int = 8443,
                config: Optional[CoreConfig] = None,
-               api_keys: Optional[Dict[str, dict]] = None):
+               api_keys: Optional[Dict[str, dict]] = None,
+               tls_config: Optional[TLSConfig] = None):
     """Run the Bedrock Core API server."""
-    server = create_server(host, port, config, api_keys)
-    print(f"Bedrock Core API server starting on {host}:{port}")
-    print(f"Environment: {(config or CoreConfig.from_env()).environment}")
-    print(f"Tier: {(config or CoreConfig.from_env()).licensing.tier}")
+    server = create_server(host, port, config, api_keys, tls_config)
+    effective_config = BedrockAPIHandler.config
+    print(f"Environment: {effective_config.environment}")
+    print(f"Tier: {effective_config.licensing.tier}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

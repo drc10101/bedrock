@@ -15,6 +15,7 @@ import pytest
 
 from bedrock.config import CoreConfig
 from bedrock.server import BedrockAPIHandler, create_server, APIError
+from bedrock.server.tls import TLSConfig
 
 
 class TestAPIServer:
@@ -34,6 +35,7 @@ class TestAPIServer:
             host="127.0.0.1", port=0,  # Random available port
             config=self.config,
             api_keys=self.api_keys,
+            tls_config=TLSConfig(enabled=False),  # No TLS for test client
         )
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever)
