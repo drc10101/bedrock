@@ -1,0 +1,13 @@
+"""
+Bedrock Licensing.
+
+Two-tier model:
+  - Developer License ($99/$499 annual): dev mode, 3 local nodes, self-signed certs
+  - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
+
+The Identity Fabric CA enforces the node count limit. No phone-home required.
+"""
+
+from bedrock.licensing.enforcement import LicenseEnforcer
+
+__all__ = ["LicenseEnforcer"]
