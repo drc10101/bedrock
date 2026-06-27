@@ -1496,3 +1496,45 @@ Files:
 - `tests/test_api_server.py` (252 lines, 14 tests)
 
 **Test count:** 728 total (606 Python + 122 TypeScript), all passing.
+
+---
+
+## B-316: Self-Healing Mesh Integration
+
+**Status:** Complete
+
+The Self-Healing Mesh (detector, state machine, router, healing orchestrator) existed
+as standalone modules. This build creates `MeshIntegrator` — the layer that wires mesh
+state changes into Bedrock's other subsystems so that quarantined/revoked nodes are
+actually blocked from accessing protected resources.
+
+Key insight: `AuditChain.__len__` returns 0 when empty, making `bool(chain)` falsy.
+All subsystem checks in MeshIntegrator use `is not None` instead of truthy checks.
+
+MeshIntegrator coordinates:
+- **Quarantine**: revoke certificates (CertificateManager), log audit event,
+  track node as blocked
+- **Revocation**: all quarantine actions + mark keys compromised (KeyManager),
+  permanent removal from routing
+- **Healing**: re-issue certificates, clear audit event, untrack node
+
+Full lifecycle flows:
+- `process_full_quarantine()` — flags -> consensus -> quarantine -> integrate
+- `process_full_revocation()` — quarantine -> revoke -> integrate
+- `process_full_healing()` — begin -> complete -> integrate (handles already-healing nodes)
+
+Access control integration:
+- `is_node_blocked()` — used by AccessController and ConsentGate to deny access
+- `is_node_revoked()` — permanent block check
+- `get_blocked_nodes()` — returns all quarantined + revoked IDs
+
+Bug fix: `AuditChain` evaluates falsy when empty (len=0). Changed all
+subsystem presence checks from truthy (`if self.audit_chain:`) to explicit
+(`if self.audit_chain is not None:`).
+
+Files:
+- `core/bedrock/mesh/integration.py` (345 lines, new — MeshIntegrator, MeshEvent)
+- `core/bedrock/mesh/__init__.py` (updated exports)
+- `tests/test_mesh_integration.py` (310 lines, 23 tests)
+
+**Test count:** 751 total (629 Python + 122 TypeScript), all passing.
