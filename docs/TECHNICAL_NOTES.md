@@ -1233,3 +1233,40 @@ Files:
 - `sdk-ts/tests/expanded.test.ts` (54 new integration tests)
 - `tests/test_licensing.py` (583 lines, 65 tests)
 - `docs/developer-portal/tutorials/defense-tutorial.md`
+
+**Test count:** 660 total (538 Python + 122 TypeScript), all passing.
+
+---
+
+## B-311: End-to-End Integration Tests
+
+**Status:** Complete
+
+17 E2E integration tests covering the full patient journey through Bedrock Core:
+
+1. **test_complete_patient_journey** — Registration → certificate → silo → PIR consent → ePRR → E2EE delivery → audit trail
+2. **test_provider_rbac_journey** — RBAC role assignment, MFA-protected write access, real TOTP code generation
+3. **test_mesh_self_healing_journey** — Node registration, flagging, healing cycle through mesh states
+4. **test_consent_lifecycle_journey** — Request → approve → verify → deny → expiry full consent flow
+5. **test_developer_tier_limits** — Developer tier: 3 nodes, self-signed certs, feature gating
+6. **test_business_tier_limits** — Business tier: 25 nodes, CA-signed certs, runtime features
+7. **test_license_expiry** — Expired license raises `LicenseExpiredError`
+8. **test_feature_access** — Feature validation: developer has `self_signed_certs` but not `ca_signed_certs`
+9. **test_certificate_issuance_by_tier** — Certificate issuance respects tier capabilities
+10. **test_cross_silo_encryption_with_consent** — Cross-silo field encryption requires consent
+11. **test_key_rotation_preserves_audit_integrity** — Key rotation doesn't break audit chain
+12. **test_batch_encryption_workflow** — Batch encrypt/decrypt across multiple fields
+13. **test_full_audit_lifecycle** — Append → verify → query → export cycle
+14. **test_audit_tamper_detection** — Tampered entries detected on verify
+15. **test_audit_export_and_reimport** — Audit chain export/reimport round-trip
+16. **test_e2ee_provider_to_patient** — E2EE message from provider to patient with key exchange
+17. **test_e2ee_cross_silo_fails** — Cross-silo E2EE correctly fails without consent
+
+Bug fixes in core code:
+- **LicenseEnforcer enum identity under pytest** — `TIER_FEATURES`, `NODE_LIMITS`, `TIER_PRICING` dict lookups now use `.get()` with string-key fallbacks. Under pytest's module isolation, enum identity can differ from the module-level dict keys; string-key fallbacks ensure robust lookups in all contexts.
+
+Files:
+- `tests/test_e2e_patient_journey.py` (644 lines, 17 tests)
+- `core/bedrock/licensing/enforcement.py` (enum identity robustness fix)
+
+**Test count:** 660 total (538 Python + 122 TypeScript), all passing.

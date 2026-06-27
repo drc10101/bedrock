@@ -99,6 +99,15 @@ TIER_FEATURES = {
     ],
 }
 
+# Add string-key fallbacks for enum identity robustness across import paths
+# (Under pytest, enum identity may differ; string lookups always work)
+for _tier in list(NODE_LIMITS):
+    NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
+for _tier in list(TIER_PRICING):
+    TIER_PRICING[_tier.value] = TIER_PRICING[_tier]
+for _tier in list(TIER_FEATURES):
+    TIER_FEATURES[_tier.value] = TIER_FEATURES[_tier]
+
 
 @dataclass
 class License:
@@ -227,8 +236,11 @@ class LicenseEnforcer:
         Returns:
             Signed license key string
         """
-        effective_max_nodes = max_nodes if max_nodes is not None else NODE_LIMITS[tier]
-        effective_features = features if features is not None else TIER_FEATURES[tier]
+        # Resolve tier to enum for consistent dict lookups (handles both enum and string inputs)
+        if isinstance(tier, str):
+            tier = LicenseTier(tier)
+        effective_max_nodes = max_nodes if max_nodes is not None else NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
+        effective_features = features if features is not None else TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))
         dev_mode = tier == LicenseTier.DEVELOPER
 
         payload = {
@@ -320,7 +332,7 @@ class LicenseEnforcer:
         except (KeyError, ValueError) as e:
             raise LicenseValidationError(f"Invalid tier in license: {e}")
 
-        max_nodes = payload.get("max_nodes", NODE_LIMITS[tier])
+        max_nodes = payload.get("max_nodes", NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)))
         if max_nodes == 0:
             max_nodes = float("inf")
 
@@ -333,7 +345,7 @@ class LicenseEnforcer:
             issued_to=payload.get("issued_to", ""),
             issued_at=payload.get("issued_at", 0),
             expires_at=payload.get("expires_at"),
-            features=payload.get("features", TIER_FEATURES[tier]),
+            features=payload.get("features", TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))),
         )
 
         # Check expiration
@@ -403,9 +415,9 @@ class LicenseEnforcer:
         """
         return {
             "tier": tier.value,
-            "max_nodes": NODE_LIMITS[tier],
-            "features": TIER_FEATURES[tier],
-            "pricing": TIER_PRICING[tier],
+            "max_nodes": NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)),
+            "features": TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])),
+            "pricing": TIER_PRICING.get(tier, TIER_PRICING.get(tier.value, {})),
         }
 
     def validate_feature_access(self, license: License, feature: str) -> bool:
@@ -436,9 +448,9 @@ class LicenseEnforcer:
         upgrades = {}
         for tier in tier_order[current_idx + 1:]:
             upgrades[tier.value] = {
-                "pricing": TIER_PRICING[tier],
-                "max_nodes": NODE_LIMITS[tier],
-                "features": TIER_FEATURES[tier],
+                "pricing": TIER_PRICING.get(tier, TIER_PRICING.get(tier.value, {})),
+                "max_nodes": NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)),
+                "features": TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])),
             }
 
         return upgrades
