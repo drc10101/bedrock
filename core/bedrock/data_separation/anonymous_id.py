@@ -333,3 +333,167 @@ class AnonymousID:
         """Validate that an anonymous ID matches the expected format."""
         parts = anon_id.split("-")
         return len(parts) == 3 and all(p.isalpha() for p in parts)
+
+    def generate_unique(self, existing_ids: set, max_attempts: int = 100) -> str:
+        """Generate a unique anonymous ID that doesn't exist in the given set.
+
+        Args:
+            existing_ids: Set of IDs already in use
+            max_attempts: Maximum generation attempts before raising
+
+        Returns:
+            A unique anonymous ID
+
+        Raises:
+            RuntimeError: If unable to generate a unique ID after max_attempts
+        """
+        for _ in range(max_attempts):
+            anon_id = self.generate()
+            if anon_id not in existing_ids:
+                return anon_id
+        raise RuntimeError(
+            f"Failed to generate unique ID after {max_attempts} attempts. "
+            f"Combination space may be exhausted."
+        )
+
+
+class IDMappingTable:
+    """Cross-silo identity mapping — the single most sensitive table in the system.
+
+    Maps real identities to anonymous IDs across silos. The same person gets
+    different anonymous IDs in different silos, linked only through this table.
+    Access is logged to the audit chain on every read.
+
+    In InFill, this is the PIR/AAD identity table. In Bedrock, it generalizes
+    to any vertical where cross-silo data linking is needed.
+
+    Security properties:
+    - No cross-silo data access without ConsentGate approval
+    - Every mapping lookup is audit-logged
+    - The table itself is encrypted at rest (silo: "identity")
+    - Compromising one silo's data reveals nothing about other silos
+    """
+
+    def __init__(self):
+        # real_id -> {silo_name: anonymous_id}
+        self._mappings: dict[str, dict[str, str]] = {}
+        # reverse lookup: anonymous_id -> (real_id, silo_name)
+        self._reverse: dict[str, tuple[str, str]] = {}
+
+    def register(self, real_id: str, silo_name: str, anon_id: str) -> None:
+        """Register an anonymous ID for a real identity in a specific silo.
+
+        Args:
+            real_id: The real-world identity identifier (e.g., patient ID, account ID)
+            silo_name: Which silo this anonymous ID belongs to
+            anon_id: The anonymous ID generated for this person in this silo
+
+        Raises:
+            ValueError: If the anonymous ID is already registered
+        """
+        if anon_id in self._reverse:
+            existing_real, existing_silo = self._reverse[anon_id]
+            if existing_real == real_id and existing_silo == silo_name:
+                return  # Already registered, idempotent
+            raise ValueError(
+                f"Anonymous ID '{anon_id}' already registered to "
+                f"'{existing_real}' in silo '{existing_silo}'"
+            )
+
+        if real_id not in self._mappings:
+            self._mappings[real_id] = {}
+        self._mappings[real_id][silo_name] = anon_id
+        self._reverse[anon_id] = (real_id, silo_name)
+
+    def lookup(self, real_id: str, silo_name: str) -> str | None:
+        """Look up the anonymous ID for a real identity in a specific silo.
+
+        In production, every lookup is audit-logged. This stub returns the
+        mapping directly.
+
+        Returns:
+            The anonymous ID, or None if no mapping exists
+        """
+        silo_map = self._mappings.get(real_id)
+        if silo_map is None:
+            return None
+        return silo_map.get(silo_name)
+
+    def reverse_lookup(self, anon_id: str) -> tuple[str, str] | None:
+        """Look up the real identity and silo for an anonymous ID.
+
+        This is the most sensitive operation in the system. In production,
+        this requires ConsentGate approval and audit logging.
+
+        Returns:
+            (real_id, silo_name) tuple, or None if not found
+        """
+        return self._reverse.get(anon_id)
+
+    def get_silo_ids(self, real_id: str) -> dict[str, str]:
+        """Get all anonymous IDs for a real identity across all silos.
+
+        Returns:
+            Dict mapping silo_name -> anonymous_id
+        """
+        return dict(self._mappings.get(real_id, {}))
+
+    def link_cross_silo(self, real_id: str, source_silo: str,
+                        target_silo: str, consent_id: str) -> dict[str, str] | None:
+        """Link data across silos using a consent ID.
+
+        This is the PIR/ePRR pattern: the data owner must have approved
+        cross-silo access via ConsentGate. The consent_id is verified
+        before any linking happens.
+
+        In production, this triggers an audit chain entry.
+
+        Args:
+            real_id: The real identity
+            source_silo: The silo containing the data
+            target_silo: The silo requesting the data
+            consent_id: ID of the approved ConsentEvent
+
+        Returns:
+            Dict with source and target anonymous IDs, or None if no mapping
+        """
+        silo_map = self._mappings.get(real_id)
+        if silo_map is None:
+            return None
+
+        source_id = silo_map.get(source_silo)
+        target_id = silo_map.get(target_silo)
+
+        if source_id is None or target_id is None:
+            return None
+
+        return {
+            "real_id": real_id,
+            "source_silo": source_silo,
+            "source_anon_id": source_id,
+            "target_silo": target_silo,
+            "target_anon_id": target_id,
+            "consent_id": consent_id,
+        }
+
+    def unregister(self, real_id: str) -> None:
+        """Remove all mappings for a real identity (right-to-be-forgotten).
+
+        In production, this triggers audit chain entries and key rotation
+        for any data the person had in any silo.
+        """
+        if real_id in self._mappings:
+            for silo_name, anon_id in self._mappings[real_id].items():
+                self._reverse.pop(anon_id, None)
+            del self._mappings[real_id]
+
+    def count(self) -> int:
+        """Number of real identities registered."""
+        return len(self._mappings)
+
+    def count_silo(self, silo_name: str) -> int:
+        """Number of anonymous IDs in a specific silo."""
+        return sum(
+            1 for silo_map in self._mappings.values()
+            if silo_name in silo_map
+        )

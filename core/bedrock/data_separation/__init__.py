@@ -2,9 +2,21 @@
 Bedrock Data Separation Layer.
 
 Silo-based compartmentalization, anonymous ID generation,
-consent-gated cross-silo access.
+cross-silo identity mapping, and consent-gated data access.
 
 Trade Secret — InFill Systems, LLC.
 """
 
-__all__ = ["Silo", "AnonymousID", "ConsentGate"]
+from bedrock.data_separation.silo import Silo, SiloManager
+from bedrock.data_separation.anonymous_id import AnonymousID, IDMappingTable
+from bedrock.data_separation.consent import ConsentGate, ConsentEvent, ConsentStatus
+
+__all__ = [
+    "Silo",
+    "SiloManager",
+    "AnonymousID",
+    "IDMappingTable",
+    "ConsentGate",
+    "ConsentEvent",
+    "ConsentStatus",
+]
