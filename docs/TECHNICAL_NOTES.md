@@ -1619,3 +1619,44 @@ Key lifecycle:
 4. Backup: export keys as JSON → import on new server
 
 **Test count:** 824 total (682 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-319: Database Persistence (SQLite)
+
+**Status:** Complete
+
+SQLite persistence layer for Bedrock modules. Server restart no longer wipes
+all state — nodes, silos, consent events, audit chain entries, and signing
+keys survive across restarts.
+
+New modules:
+- `core/bedrock/storage/sqlite_backend.py` — SQLiteBackend: key-value store
+  with WAL mode, thread-local connections, lazy table creation
+- `core/bedrock/storage/persistence.py` — PersistentBedrock: orchestrates
+  save/restore across all modules
+
+SQLiteBackend features:
+- `save(table, key, data)` / `load(table, key)` / `load_all(table)`
+- `delete(table, key)` / `count(table)` / `exists(table, key)`
+- `query(table, filter_fn)` — filter with callable
+- `clear_table(table)` / `list_tables()`
+- Thread-local connections with WAL mode for concurrent reads
+- Context manager support (`with SQLiteBackend(...) as db`)
+- Module convenience methods: `save_node()`, `save_silo()`, etc.
+
+PersistentBedrock features:
+- Wraps all core modules (registry, certs, silos, consent, audit, keygen)
+- `save_all()` / `restore_all()` — bulk operations
+- `clear_all()` — wipe all persisted data
+- Individual save/restore per module type
+- Full workflow: create state → save → restore in fresh instance → validate
+
+Design decision: persistence is a separate layer, not embedded in modules.
+This keeps modules fast in-memory while persistence is opt-in. The server
+can choose to persist on every mutation (safe) or on shutdown (fast).
+
+Tables: bedrock_nodes, bedrock_certificates, bedrock_silos,
+bedrock_consents, bedrock_audit, bedrock_licenses
+
+**Test count:** 851 total (709 Python + 20 SDK + 122 TypeScript), all passing.
