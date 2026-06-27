@@ -872,9 +872,10 @@ Files created:
 | Integration (Python) | 16 | All passing |
 | Integration (TypeScript) | 16 | All passing |
 | Healthcare Template | 38 | All passing |
-| **Total** | **622** | **All passing** |
+| Banking Template | 43 | All passing |
+| **Total** | **665** | **All passing** |
 
-*Last updated: B-301 complete, 622 total tests passing*
+*Last updated: B-302 complete, 665 total tests passing*
 
 ---
 
@@ -901,3 +902,30 @@ parameter for vertical-specific key derivation prefixes (e.g.
 `bedrock:silo:healthcare:identity:v1`).
 
 Files: `templates/healthcare/__init__.py`, `templates/healthcare/test_healthcare.py`
+
+---
+
+## B-302: Banking Vertical Template
+
+**Status:** Complete
+
+Pre-configured banking vertical for PCI-DSS compliance. Provides:
+
+1. **Silo definitions** — identity (PII/KYC), transactions (financial data),
+   auth (credentials/device fingerprints) with PCI-DSS-specific categories
+   including payment_cards isolation (PCI-DSS 3.4)
+2. **Consent flows** — account_inquiry, fund_transfer, loan_application,
+   fraud_review, third_party_sharing with PCI-DSS section mappings
+3. **Role-portal mappings** — customer, teller, analyst, admin, auditor
+   with PCI minimum necessary standard enforcement
+4. **PCI-DSS compliance report** — Maps Requirements 3-12 to Bedrock enforcement
+5. **CoreConfig presets** — Production PCI-DSS config with 1-year audit
+   retention, 30-min sessions, 3-attempt lockout, short consent TTLs
+
+Banking template follows same architecture as healthcare but with:
+- Shorter consent TTLs (30 min default vs 1 hr healthcare)
+- Shorter sessions (30 min vs 1 hr)
+- Stricter lockout (3 attempts vs 5)
+- PCI-DSS 3.4 PAN isolation in transactions silo only
+
+Files: `templates/banking/__init__.py`, `templates/banking/test_banking.py`
