@@ -685,4 +685,50 @@ Key API discoveries during integration:
   `violation_threshold` violations at the minute limit.
 - `ConsentGate.check_consent()` returns `None` for non-existent or revoked consents.
 
-*Last updated: B-112 complete, 464 tests passing*
+---
+
+## B-201: Python SDK Project Structure
+
+**Status:** Complete
+
+Developer-friendly Python SDK wrapping all Bedrock Core modules. Single entry
+point (`BedrockClient`) with property-accessed modules:
+
+- `client.identity` — Node registration, certificates, capability scoping
+- `client.encryption` — Field-level encrypt/decrypt, E2EE delivery, key rotation
+- `client.data` — Cross-silo consent, anonymous ID mapping, right to be forgotten
+- `client.audit` — Tamper-evident chain write, verify, query, export
+- `client.access` — RBAC user creation, authentication, MFA, permission checks
+- `client.transport` — TLS config, downgrade detection, mesh flag/heal/reroute
+
+SDK design decisions:
+- `CoreConfig` (not BedrockConfig) is the actual config class name
+- `AccessController.authenticate(username, password, portal)` — not role-based
+- `AccessController.verify_mfa(session_id, totp_code)` — takes ID, not Session
+- `AuditEntry.entry_hash` (not `.hash`); `head_hash`/`tail_hash` are properties
+- `DataCategory` uses lowercase: `"identity"`, `"medical"`, not uppercase
+- `IDMappingTable.register(real_id, silo_name, anon_id)` — 3 args, SDK generates
+- `E2EEDeliverer.decrypt_from_sender(sender_public_key, recipient_private_key)`
+- Mesh `process_flags()` requires two calls: ACTIVE→SUSPECT→QUARANTINED
+- `SelfHealingMesh(healing_period_seconds=0)` for instant test healing
+
+Files created:
+- `sdk/pyproject.toml` — Build config, dependencies, linting
+- `sdk/README.md` — Quick start guide
+- `sdk/bedrock_sdk/__init__.py` — Package entry
+- `sdk/bedrock_sdk/client.py` — BedrockClient central API
+- `sdk/bedrock_sdk/identity.py` — IdentityModule
+- `sdk/bedrock_sdk/encryption.py` — EncryptionModule
+- `sdk/bedrock_sdk/data.py` — DataModule
+- `sdk/bedrock_sdk/audit.py` — AuditModule
+- `sdk/bedrock_sdk/access.py` — AccessModule
+- `sdk/bedrock_sdk/transport.py` — TransportModule
+- `sdk/tests/test_sdk.py` — 36 SDK tests
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Core | 464 | All passing |
+| SDK | 36 | All passing |
+| **Total** | **500** | **All passing** |
+
+*Last updated: B-201 complete, 500 tests passing*
