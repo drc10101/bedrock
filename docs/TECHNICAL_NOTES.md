@@ -1446,3 +1446,53 @@ Files:
 - `.gitignore` (updated)
 
 **Test count:** 714 total (592 Python + 122 TypeScript), all passing.
+
+---
+
+## B-315: InFill Portal Frontend — Bedrock Core API Server
+
+**Status:** Complete
+
+Built the general-purpose Bedrock Core REST API server — the integration layer
+that any licensed developer (InFill, banking, insurance, defense) uses to build
+their application on Bedrock. This is NOT an InFill-specific API; it exposes
+Bedrock's core primitives (nodes, silos, consent, encryption, audit) so any
+downstream product can build on top.
+
+Revenue model alignment: Developer license holders build against this API,
+then must upgrade to Production Runtime for per-node CA-enforced deployment.
+
+API Server (`core/bedrock/server.py`):
+
+Endpoints (all under /api/v1/, Bearer token auth required):
+- Health: GET /health (no auth), GET /health/detailed (auth)
+- Identity: POST /nodes, GET /nodes, GET /nodes/{id}
+- Certificates: POST /certificates, DELETE /certificates/{node_id}
+- Data Separation: POST /silos, GET /silos
+- Consent: POST /consent, PUT /consent/{id}/approve, PUT /consent/{id}/deny
+- Encryption: POST /encrypt, POST /decrypt (501 — key vault integration needed)
+- Audit: GET /audit, GET /audit/verify
+- Licensing: POST /license/validate
+
+Security model:
+- Bearer token authentication on all /api/v1/ endpoints
+- /health is public (for load balancers and orchestration probes)
+- Rate limiting enforced per-tier (developer vs business vs enterprise)
+- No data leaves encrypted silos without consent verification
+- Audit trail logging on every mutation
+
+Test coverage (14 tests):
+- Health endpoints with and without auth
+- Authentication enforcement (401 for missing/invalid keys)
+- Node registration and certificate issuance
+- Silo creation and listing
+- Consent request flow
+- License validation
+- Audit verification
+- Error handling (404, 400)
+
+Files:
+- `core/bedrock/server.py` (521 lines, new — HTTP API server)
+- `tests/test_api_server.py` (252 lines, 14 tests)
+
+**Test count:** 728 total (606 Python + 122 TypeScript), all passing.
