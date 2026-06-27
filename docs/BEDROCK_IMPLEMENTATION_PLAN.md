@@ -1,6 +1,6 @@
 # Bedrock Implementation Plan
 
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Status:** Draft  
 **Created:** 2026-06-27
 
@@ -67,10 +67,10 @@ Build pre-configured verticals and comprehensive documentation.
 || B-305 | Developer Portal | Documentation site, API reference, tutorials, code examples | 5 days | B-215, B-216 |
 || B-306 | Compliance Kits | HIPAA, SOC 2, PCI-DSS, GLBA, DFARS mapping documents per vertical | 3 days | B-301 through B-304 |
 || B-307 | InFill Re-implementation | Re-implement InFill on Bedrock Core + Healthcare Template | 5 days | B-301, B-215, B-216 |
-|| B-308 | Subscription & Licensing System | License key validation, tier management, usage metering | 3 days | B-112 |
+|| B-308 | Licensing & Enforcement System | Developer license ($99/$499 annual, dev mode with 3 local nodes, self-signed certs), Runtime license ($5K/$20K/custom annual, per-node CA-enforced), license key validation (offline-capable, no phone-home), dev mode vs production CA enforcement, vertical template add-on purchasing | 5 days | B-112, B-105, B-107 |
 || B-309 | Security Audit (External) | Third-party penetration test and code audit | 5 days | B-112, B-215, B-216 |
 
-**Phase 3 Total: ~33 days**
+**Phase 3 Total: ~35 days**
 
 ### Phase 4: Launch & Go-to-Market
 
@@ -93,9 +93,9 @@ Build pre-configured verticals and comprehensive documentation.
 |-------|----------|--------------|
 | Phase 1: Foundation | ~29 days | Core runtime + Self-Healing Mesh passes all integration tests |
 | Phase 2: SDK | ~22 days | Python + TypeScript SDKs pass all integration tests |
-| Phase 3: Templates & Docs | ~33 days | 4 vertical templates + developer portal + InFill on Bedrock |
+| Phase 3: Templates & Docs | ~35 days | 4 vertical templates + developer portal + InFill on Bedrock |
 | Phase 4: Launch | ~31 days | Public launch with 3-5 beta design partners |
-| **Total** | **~115 days** | |
+| **Total** | **~117 days** | |
 
 ---
 

@@ -1,6 +1,6 @@
 # Bedrock Architecture Specification
 
-**Version:** 1.1.0  
+**Version:** 1.2.0  
 **Status:** Draft  
 **Author:** InFill Systems, LLC  
 **Classification:** TRADE SECRET — No Public Distribution
@@ -348,31 +348,105 @@ Bedrock networks are **mesh-capable**, not rigid hierarchies:
 
 ---
 
-## 8. Subscription Model
+## 8. Licensing Model
 
-### 8.1 Tiers
+### 8.1 Philosophy
 
-| Tier | Monthly | Includes | Target |
-|------|---------|----------|--------|
-| **Developer** | $99 | SDK, documentation, community support | Individual developers, prototyping |
-| **Team** | $499 | SDK + Core (5 nodes), email support | Small teams, staging environments |
-| **Business** | $1,999 | SDK + Core (25 nodes), priority support, compliance templates | Mid-market companies |
-| **Enterprise** | Custom | SDK + Core (unlimited), dedicated support, Bedrock Cloud (future), custom verticals | Large organizations |
+Bedrock generates revenue at two stages of the customer lifecycle:
 
-### 8.2 What Subscribers Get
+1. **Developer License** -- Low-cost, broad adoption. Developers learn Bedrock, build prototypes, integrate into products. Price is a rounding error compared to developer time.
 
-- **Bedrock Core**: Runtime binaries, configuration, deployment guides
-- **Bedrock SDK**: Client libraries (Python, TypeScript, more later), API documentation, code examples
-- **Vertical Templates**: Pre-built configurations for healthcare (InFill-derived), banking, insurance, defense
-- **Updates**: Security patches, feature releases, compliance updates
-- **Compliance Kits**: HIPAA, SOC 2, PCI-DSS, GLBA, DFARS mapping documents
+2. **Production Runtime** -- Per-node pricing when the product ships. The customer is already making money. Switching costs are enormous. Node pricing scales with their growth -- we grow when they grow.
+
+The developer license is the funnel. The runtime license is the revenue engine. The SDK is never sold separately -- it's how you use what you've licensed.
+
+### 8.2 Developer License (Annual)
+
+For individual developers and small teams building with Bedrock. Includes everything needed to develop, test, and prototype. Does NOT include production deployment rights.
+
+| Tier | Annual | Dev Seats | Production Nodes | Includes |
+|------|--------|-----------|-------------------|----------|
+| **Developer** | $99 | 1 | 0 (dev/test only) | SDK, documentation, community support, local dev mode (up to 3 local nodes for testing) |
+| **Team** | $499 | 5 | 0 (dev/test only) | SDK, documentation, email support, local dev mode, 1 vertical template |
+
+**What Developer License includes:**
+- **Bedrock SDK**: Full client libraries (Python, TypeScript), API documentation, code examples
+- **Local dev mode**: Up to 3 nodes on localhost for development and testing (no production deployment)
+- **Vertical templates**: 1 included (Team), healthcare template available for purchase ($199/year standalone)
+- **Updates**: Security patches, minor version updates
 - **Developer Portal**: Documentation, tutorials, API reference, community forum
 
-### 8.3 What Subscribers Don't Get
+**What Developer License does NOT include:**
+- Production deployment rights (requires Runtime License)
+- Bedrock source code (unless Enterprise with NDA)
+- Production CA certificate issuance (dev mode uses self-signed)
+- Compliance kits (available as add-on)
 
-- Access to Bedrock source code (unless enterprise with NDA)
-- Bedrock-managed infrastructure (self-hosted first)
+### 8.3 Production Runtime License (Annual)
+
+For organizations deploying Bedrock in production. Per-node pricing enforced by the Identity Fabric -- the CA will not issue certificates beyond the licensed node count. No phone-home required; the license key unlocks the node ceiling in the local CA.
+
+| Tier | Annual | Nodes | Vertical Templates | Support | Target |
+|------|--------|-------|--------------------|---------|--------|
+| **Starter** | $5,000 | 5 | 1 (healthcare) | Email | Small companies, single vertical |
+| **Business** | $20,000 | 25 | All 4 | Priority | Mid-market, multiple verticals |
+| **Enterprise** | Custom | Unlimited | All + custom | Dedicated | Large organizations, defense |
+
+**Node pricing economics:**
+
+| Deployment Scale | Nodes | Starter | Business | Enterprise |
+|-----------------|-------|---------|----------|------------|
+| Small clinic / fintech startup | 5 | $5,000 | — | — |
+| Regional hospital / mid-size bank | 25 | — | $20,000 | — |
+| Hospital system / national bank | 100 | — | $80,000 | Custom |
+| Defense / Fortune 500 | 500+ | — | — | Custom |
+
+**Add-ons (annual):**
+- Additional vertical template (Starter only): $5,000/year each
+- Compliance kit (HIPAA, SOC 2, PCI-DSS, GLBA, DFARS): $3,000/year each (included in Business+)
+- Additional SDK language (Go, Rust, Java): included when available
+- Bedrock Cloud (future): premium tier for managed control plane
+
+**What Runtime License includes:**
+- Everything in Developer License
+- **Production deployment rights**: Full CA certificate issuance, Self-Healing Mesh, production-grade configuration
+- **Bedrock Core**: Runtime binaries, configuration, deployment guides, systemd/supervisor configs
+- **Node enforcement**: CA refuses certificates beyond licensed count (structural, not DRM)
+- **Self-Healing Mesh**: Full production mesh with consensus isolation, rerouting, healing
+- **Vertical Templates**: Industry-specific silo configs, consent flows, compliance mappings
+- **Updates**: Security patches, feature releases, compliance updates, version upgrades
+- **Compliance Kits**: Regulatory mapping documents per vertical (Business+)
+
+### 8.4 Enforcement Architecture
+
+The license is enforced structurally, not by phone-home or obfuscation:
+
+1. **CA-enforced node limit**: The organization's CA (which runs on their infrastructure) reads the license key and will not issue certificates beyond the licensed node count. You cannot add a 6th node on a Starter license because the CA won't sign the certificate.
+
+2. **No phone-home required**: The CA runs locally. Air-gapped deployments work. Defense customers can operate without internet connectivity.
+
+3. **Dev mode vs production**: Developer licenses generate self-signed certificates valid only on localhost. Production certificates require a Runtime license key to activate the CA.
+
+4. **Tamper resistance**: Bypassing the CA means running without the Identity Fabric, which means running without the Self-Healing Mesh, which means running without Bedrock -- you have a crypto library, not the framework. The license protects the entire architecture, not a single function.
+
+5. **Audit trail**: Every certificate issuance, renewal, and revocation is logged to the audit chain. License compliance is verifiable without external access.
+
+### 8.5 Revenue Projections
+
+| Year | Developer Licenses | Runtime Licenses | ARR Target |
+|------|-------------------|-----------------|------------|
+| Year 1 | 200 x $99 = $19,800 | 10 Starter + 5 Business = $175,000 | ~$195K |
+| Year 2 | 500 x $99 = $49,500 | 30 Starter + 15 Business = $525,000 | ~$575K |
+| Year 3 | 1,000 x $99 = $99,000 | 75 Starter + 30 Business + 3 Enterprise = $1.35M | ~$1.45M |
+
+Developer license revenue is modest. It exists to fund adoption and create switching costs. Runtime license revenue is the business.
+
+### 8.6 What Subscribers Don't Get
+
+- Access to Bedrock source code (unless Enterprise with NDA)
+- Bedrock-managed infrastructure (self-hosted first; Bedrock Cloud is future premium tier)
 - Customer data passing through Bedrock servers (architecturally impossible)
+- Production deployment rights on a Developer license
 
 ---
 
