@@ -1,0 +1,56 @@
+# Bedrock Core — Local Development Docker Compose
+# NOT for production. Use orchestrated deployment (K8s, etc.) for prod.
+
+services:
+  bedrock-core:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: bedrock-core
+    ports:
+      - "8443:8443"
+    environment:
+      - BEDROCK_ENV=development
+      - BEDROCK_DEBUG=true
+      - BEDROCK_LOG_LEVEL=DEBUG
+      - BEDROCK_DEV_MODE=true
+      - BEDROCK_TIER=developer
+      - BEDROCK_MASTER_KEY_FILE=/run/secrets/master_key
+    volumes:
+      - ../core:/opt/bedrock/core:ro
+      - bedrock-audit:/var/lib/bedrock/audit
+      - bedrock-config:/etc/bedrock
+    secrets:
+      - master_key
+    healthcheck:
+      test: ["CMD", "python", "-c", "from bedrock.config import CoreConfig; c = CoreConfig.from_env(); print('healthy')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Test runner
+  bedrock-test:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: bedrock-test
+    command: ["python", "-m", "pytest", "tests/", "-v", "--tb=short"]
+    environment:
+      - BEDROCK_ENV=test
+      - BEDROCK_DEV_MODE=true
+      - BEDROCK_TIER=developer
+    volumes:
+      - ../tests:/opt/bedrock/tests:ro
+      - ../core:/opt/bedrock/core:ro
+    profiles:
+      - test
+
+secrets:
+  master_key:
+    file: ./secrets/master_key.txt
+
+volumes:
+  bedrock-audit:
+  bedrock-config:

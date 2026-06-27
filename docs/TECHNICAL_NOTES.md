@@ -1390,3 +1390,59 @@ Files:
 - `core/bedrock/identity/certificates.py` (NODE_LIMITS enum robustness fix)
 
 **Test count:** 709 total (587 Python + 122 TypeScript), all passing.
+
+---
+
+## B-314: Deployment Configuration
+
+**Status:** Complete
+
+Created deployment infrastructure for containerized Bedrock Core:
+
+1. **Dockerfile** (`deploy/Dockerfile`):
+   - Python 3.14-slim base image
+   - Non-root `bedrock` user for security
+   - Layer-cached pip install
+   - Health check via CoreConfig.from_env()
+   - Runtime directories for audit, config, logs
+   - Production defaults (BEDROCK_ENV=production, DEV_MODE=false)
+
+2. **Docker Compose** (`deploy/docker-compose.yml`):
+   - `bedrock-core` service with mounted volumes and Docker secrets
+   - `bedrock-test` service (profiles: test) for CI containerized testing
+   - Secret management for master key
+   - Named volumes for audit and config persistence
+
+3. **Environment config** (`deploy/.env.example`):
+   - All BEDROCK_* environment variables documented
+   - Sensible dev defaults, production hardening notes
+   - Telemetry explicitly disabled by default (no phone-home)
+
+4. **CI/CD pipeline** (`.github/workflows/ci.yml`):
+   - Multi-version Python test matrix (3.12, 3.13, 3.14)
+   - TypeScript SDK tests with coverage
+   - Bandit security scan + Safety dependency check
+   - Docker image build verification
+   - Coverage artifact upload
+
+5. **Health check module** (`core/bedrock/health.py`):
+   - `HealthChecker` validates encryption, identity, audit, licensing
+   - `HealthReport` with per-component latency, status, and serialization
+   - Used by Docker HEALTHCHECK and orchestration probes
+
+6. **Requirements** (`requirements.txt`):
+   - cryptography>=43.0.0, pytest, pytest-cov, pytest-asyncio
+
+7. **`.gitignore`** update: `.env.example` no longer excluded (was caught by `.env.*`)
+
+Files:
+- `deploy/Dockerfile` (new)
+- `deploy/docker-compose.yml` (new)
+- `deploy/.env.example` (new)
+- `.github/workflows/ci.yml` (new)
+- `core/bedrock/health.py` (new, 153 lines)
+- `requirements.txt` (new)
+- `tests/test_health.py` (new, 5 tests)
+- `.gitignore` (updated)
+
+**Test count:** 714 total (592 Python + 122 TypeScript), all passing.
