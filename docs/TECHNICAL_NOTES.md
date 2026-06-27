@@ -278,7 +278,7 @@ Each level is deterministic: same master key + same info string = same derived k
 | Mesh State Machine | 14 | Passing |
 | Node | 7 | Passing |
 | Core | 25 | Passing |
-| **Total** | **233** | **All passing** |
+| **Total** | **263** | **All passing** |
 
 ---
 
@@ -385,11 +385,54 @@ Consecutive failures are counted per node. A successful attestation resets the c
 
 ---
 
+## B-107: Identity Fabric — Certificate Lifecycle
+
+**What:** Every node gets a short-lived certificate (24h default) that binds its cryptographic identity to its capability scope. Certificates are the enforcement mechanism for the Self-Healing Mesh — a quarantined node's certificate is revoked immediately, cutting off its ability to route, relay, or decrypt data.
+
+**Why:** Without certificates, there's no way to enforce capability scope at the network level. A compromised node with a valid cert can be instantly cut off by revoking the cert and distributing the revocation to all nodes via CRL. Short-lived certs mean even if one is stolen, it expires in hours.
+
+**Components:**
+
+### Certificate
+A dataclass representing a node certificate. In production this would be X.509 with custom Bedrock extensions. Key fields:
+- `serial` — Unique identifier (format: `bedrock-<uuid4>`)
+- `node_uuid` — Which node this cert belongs to
+- `public_key_hash` — SHA-256 of the node's ed25519 public key (binds identity)
+- `capabilities` — Data categories this node can access (enforced by AAD + Access Control)
+- `issued_at` / `expires_at` — Short TTL, default 24h
+- `status` — ACTIVE, EXPIRED, REVOKED, PENDING_RENEWAL
+- `issuer` — `bedrock-ca` for Runtime, `bedrock-self-signed` for Developer
+- `license_tier` — Which license tier issued this cert
+
+### CertificateManager
+Manages the full certificate lifecycle:
+- `issue_certificate()` — Creates a new cert for a registered node. Enforces license limits.
+- `renew_certificate()` — Auto-renews before expiry. New serial, same capabilities. Old cert stays valid until it expires (grace period).
+- `revoke_certificate()` — Immediate revocation when a node is quarantined. Adds serial to CRL.
+- `check_crl()` — Checks if a serial is on the Certificate Revocation List.
+- `check_license_limit()` — Verifies active cert count is within the licensed limit.
+
+### License Tiers (the two-tier licensing model)
+This is where the business model meets the code:
+
+| Tier | Max Nodes | Certificate Authority | Use Case |
+|------|-----------|----------------------|----------|
+| DEVELOPER | 3 | Self-signed | Dev/testing only |
+| STARTER | 5 | CA-signed | Small production |
+| BUSINESS | 25 | CA-signed | Mid-market |
+| ENTERPRISE | Unlimited | CA-signed | Large/air-gapped |
+
+Developer tier enforces localhost-only, 3-node max. This is the $99/$499/year funnel. Runtime tiers ($5K–$20K+/year) get CA-signed certs and production node limits.
+
+### LicenseExceededError
+Raised when `issue_certificate()` would exceed the licensed node count. The error message tells you exactly what tier you're on and what the limit is. Revoking a certificate frees up a slot.
+
+---
+
 ## Remaining Work (Phase 1)
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-107 | Identity Fabric — Certificate Lifecycle | X.509 cert issuance, renewal, revocation |
 | B-108 | Audit Chain | Tamper-evident SHA-256 hash chain, 6-year retention |
 | B-109 | Access Control | RBAC, role-portal mapping, scoped sessions, MFA |
 | B-110 | Transport Security | TLS termination, E2EE delivery, rate limiting |
@@ -398,4 +441,4 @@ Consecutive failures are counted per node. A successful attestation resets the c
 
 ---
 
-*Last updated: B-104 complete, 159 tests passing*
+*Last updated: B-107 complete, 263 tests passing*

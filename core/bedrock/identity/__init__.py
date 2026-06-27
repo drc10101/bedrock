@@ -13,6 +13,10 @@ from bedrock.identity.attestation import (
     AttestationManager, AttestationClaim, AttestationResult,
     AttestationStatus, AttestationPolicy, BaselineEntry, compute_state_hash,
 )
+from bedrock.identity.certificates import (
+    CertificateManager, Certificate, CertificateStatus,
+    LicenseTier, LicenseExceededError, NODE_LIMITS,
+)
 from bedrock.identity.capabilities import CapabilityScope, DataCategory
 
 __all__ = [
@@ -29,6 +33,12 @@ __all__ = [
     "AttestationPolicy",
     "BaselineEntry",
     "compute_state_hash",
+    "CertificateManager",
+    "Certificate",
+    "CertificateStatus",
+    "LicenseTier",
+    "LicenseExceededError",
+    "NODE_LIMITS",
     "CapabilityScope",
     "DataCategory",
 ]
