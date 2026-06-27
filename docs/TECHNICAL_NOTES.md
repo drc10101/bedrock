@@ -877,7 +877,7 @@ Files created:
 | Defense Template | 48 | All passing |
 | **Total** | **758** | **All passing** |
 
-*Last updated: B-304 complete, 758 total tests passing*
+*Last updated: B-305 complete, 758 total tests passing*
 
 ---
 
@@ -991,3 +991,45 @@ Defense-specific design decisions:
 - All consent flows require reason (no exceptions — need-to-know)
 
 Files: `templates/defense/__init__.py`, `templates/defense/test_defense.py`
+
+---
+
+## B-305: Developer Portal
+
+**Status:** Complete
+
+Documentation suite for the Bedrock SDK, providing:
+
+1. **Quick Start Guide** — 5-minute setup with Python/TypeScript code examples
+   for client initialization, node registration, silo creation, encryption,
+   consent, audit, and vertical templates
+
+2. **API Reference** — Complete method signatures, parameters, return types,
+   and examples for all 6 SDK modules:
+   - BedrockClient (entry point + verify_integrity)
+   - IdentityModule (register_node, issue/revoke_certificate, create_scope, baseline_attestation)
+   - EncryptionModule (encrypt, decrypt, send/receive_e2ee, rotate_keys)
+   - DataModule (create_silo, request/approve/revoke_consent, anonymous IDs)
+   - AuditModule (log, verify, query, export)
+   - AccessModule (create_user, start/end_session, verify_mfa, check_permission)
+   - TransportModule (configure_tls, check_downgrade, add_neighbor, flag_node, rate_limit)
+
+3. **Tutorials** — Step-by-step guides for each vertical:
+   - Healthcare: PIR consent, PHI/PII separation, HIPAA compliance report
+   - Banking: PAN isolation, PCI-DSS consent flows, compliance report
+   - Investment: Trade execution (5-min TTL), SEC/FINRA compliance
+   - Defense: Clearance-gated access, CUI management, CMMC/DFARS compliance
+
+4. **Configuration Guide** — Complete CoreConfig reference with:
+   - Per-option descriptions and defaults
+   - Vertical template defaults comparison table
+   - Compliance mapping (which regulation requires which setting)
+
+Files:
+- `docs/developer-portal/quick-start.md`
+- `docs/developer-portal/api-reference.md`
+- `docs/developer-portal/configuration.md`
+- `docs/developer-portal/tutorials/healthcare-tutorial.md`
+- `docs/developer-portal/tutorials/banking-tutorial.md`
+- `docs/developer-portal/tutorials/investment-tutorial.md`
+- `docs/developer-portal/tutorials/defense-tutorial.md`
