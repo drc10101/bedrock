@@ -731,4 +731,54 @@ Files created:
 | SDK | 36 | All passing |
 | **Total** | **500** | **All passing** |
 
-*Last updated: B-201 complete, 500 tests passing*
+*Last updated: B-208 complete, 552 tests passing*
+
+---
+
+## B-208: TypeScript SDK Project Structure
+
+**Status:** Complete
+
+TypeScript SDK mirroring the Python SDK architecture. Uses Web Crypto API for
+browser/Node.js compatibility. Same module structure as Python SDK:
+
+- `BedrockClient` — Central entry point with `init()` for crypto setup
+- `IdentityModule` — Node registration, certificates, capability scoping
+- `EncryptionModule` — AES-256-GCM field encryption with v2 prefix format
+- `DataModule` — Cross-silo consent, anonymous IDs, right to be forgotten
+- `AuditModule` — SHA-256 hash chain, Web Crypto digest
+- `AccessModule` — RBAC, authentication, MFA (simplified for SDK)
+- `TransportModule` — TLS config, downgrade detection, mesh networking
+
+TypeScript-specific decisions:
+- Web Crypto API (`crypto.subtle`) for all crypto operations
+- `v2:` prefix format matching Python SDK wire format
+- `NodeState` enum used directly (not `NodeStateEnum` alias)
+- `downlevelIteration: true` in tsconfig for Map iteration
+- Branch coverage threshold set to 65% (will increase as edge cases are added)
+- 52 tests covering all modules, including error branches
+
+Files created:
+- `sdk-ts/package.json` — Build config, dev dependencies
+- `sdk-ts/tsconfig.json` — TypeScript strict config with downlevelIteration
+- `sdk-ts/jest.config.js` — Jest + ts-jest, coverage thresholds
+- `sdk-ts/README.md` — Quick start guide with all module APIs
+- `sdk-ts/src/types.ts` — All shared enums and interfaces
+- `sdk-ts/src/client.ts` — BedrockClient central entry point
+- `sdk-ts/src/identity.ts` — IdentityModule
+- `sdk-ts/src/encryption.ts` — EncryptionModule (AES-256-GCM + ECDH)
+- `sdk-ts/src/data.ts` — DataModule
+- `sdk-ts/src/audit.ts` — AuditModule (SHA-256 chain via Web Crypto)
+- `sdk-ts/src/access.ts` — AccessModule
+- `sdk-ts/src/transport.ts` — TransportModule (TLS + Mesh)
+- `sdk-ts/src/index.ts` — Public exports
+- `sdk-ts/tests/sdk.test.ts` — 52 TypeScript SDK tests
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Core | 464 | All passing |
+| Python SDK | 36 | All passing |
+| TypeScript SDK | 52 | All passing |
+| **Total** | **552** | **All passing** |
+
+*Last updated: B-208 complete, 552 tests passing*
