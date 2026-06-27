@@ -6,8 +6,29 @@ Two-tier model:
   - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
 
 The Identity Fabric CA enforces the node count limit. No phone-home required.
+License keys are offline-validated HMAC-SHA256 signed payloads.
 """
 
-from bedrock.licensing.enforcement import LicenseEnforcer
+from bedrock.licensing.enforcement import (
+    LicenseEnforcer,
+    License,
+    LicenseTier,
+    LicenseValidationError,
+    LicenseExpiredError,
+    LicenseLimitError,
+    NODE_LIMITS,
+    TIER_PRICING,
+    TIER_FEATURES,
+)
 
-__all__ = ["LicenseEnforcer"]
+__all__ = [
+    "LicenseEnforcer",
+    "License",
+    "LicenseTier",
+    "LicenseValidationError",
+    "LicenseExpiredError",
+    "LicenseLimitError",
+    "NODE_LIMITS",
+    "TIER_PRICING",
+    "TIER_FEATURES",
+]

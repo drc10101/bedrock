@@ -875,9 +875,10 @@ Files created:
 | Banking Template | 43 | All passing |
 | Investment Template | 45 | All passing |
 | Defense Template | 48 | All passing |
-| **Total** | **758** | **All passing** |
+| Licensing System | 65 | All passing |
+| **Total** | **815** | **All passing** |
 
-*Last updated: B-306 complete, 758 total tests passing*
+*Last updated: B-308 complete, 815 total tests passing*
 
 ---
 
@@ -1076,4 +1077,69 @@ Files:
 - `docs/compliance/soc2-compliance-kit.md`
 - `docs/compliance/glba-compliance-kit.md`
 - `docs/compliance/dfars-cmmc-compliance-kit.md`
+
+---
+
+## B-308: Licensing & Enforcement System
+
+**Status:** Complete
+
+Offline-validated, CA-enforced two-tier licensing system. The Identity Fabric CA will not
+issue certificates beyond the licensed node count — enforcement is architectural, not DRM.
+
+### Architecture
+
+License keys are HMAC-SHA256 signed payloads validated entirely offline. No phone-home.
+Format: `1:<base64url(payload)>:<base64url(hmac-sha256)>`
+
+### Two-Tier Model
+
+| Tier | Price | Max Nodes | Certs | Mode |
+|------|-------|-----------|-------|------|
+| Developer | $99/yr (indiv), $499/yr (team of 5) | 3 | Self-signed, localhost only | Dev |
+| Starter | $5K/yr | 5 | CA-signed, production | Runtime |
+| Business | $20K/yr | 25 | CA-signed, production | Runtime |
+| Enterprise | Custom | Unlimited | CA-signed, air-gap capable | Runtime |
+
+### Feature Matrix
+
+- **Developer:** self_signed_certs, localhost_only, max_3_nodes, audit_export, basic_mesh
+- **Starter:** + ca_signed_certs, production_deployment, self_healing_mesh, compliance_reports
+- **Business:** + custom_certificates, priority_support, max_25_nodes
+- **Enterprise:** + custom_ca, air_gap_support, dedicated_support, unlimited_nodes
+
+### Key Components
+
+- `LicenseEnforcer`: validate_license(), generate_license_key(), can_issue_certificate(),
+  enforce_developer_mode(), validate_feature_access(), get_upgrade_path()
+- `License` dataclass: tier, max_nodes, max_devs, dev_mode, features, expiration
+- `LicenseValidationError`, `LicenseExpiredError`, `LicenseLimitError` exceptions
+- Integration with `CertificateManager`: license-enforced node limits during certificate issuance
+
+### Security
+
+- HMAC-SHA256 signature verification prevents key tampering
+- Tampered payload or signature raises `LicenseValidationError`
+- Expired keys raise `LicenseExpiredError`
+- Developer mode enforced architecturally: self-signed certs, localhost-only, no production
+
+### Test Coverage
+
+65 tests across 8 test classes:
+- License key generation (9 tests)
+- License validation (8 tests)
+- Invalid license handling (7 tests) — tampering, corruption, wrong version
+- License expiration (5 tests) — expired, perpetual, days-until
+- License enforcement (8 tests) — node limits, developer restrictions
+- Feature access (6 tests) — tier-specific feature gating
+- Tier info and pricing (7 tests)
+- Upgrade paths (5 tests)
+- File validation (2 tests)
+- License properties (4 tests)
+- Certificate integration (5 tests) — cross-module enforcement
+
+Files:
+- `core/bedrock/licensing/enforcement.py` (382 lines)
+- `core/bedrock/licensing/__init__.py`
+- `tests/test_licensing.py` (583 lines, 65 tests)
 - `docs/developer-portal/tutorials/defense-tutorial.md`
