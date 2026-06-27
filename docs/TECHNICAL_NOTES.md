@@ -278,7 +278,7 @@ Each level is deterministic: same master key + same info string = same derived k
 | Mesh State Machine | 14 | Passing |
 | Node | 7 | Passing |
 | Core | 25 | Passing |
-| **Total** | **204** | **All passing** |
+| **Total** | **233** | **All passing** |
 
 ---
 
@@ -342,11 +342,53 @@ Once REVOKED, a node cannot transition to any other state. This is the mesh's ki
 
 ---
 
+## B-106: Identity Fabric — Attestation
+
+**What:** Nodes prove their software state matches a known-good baseline at boot time. If a sensor's firmware has been tampered with, the attestation fails and the node is quarantined before it can do any damage.
+
+**Why:** Without attestation, an attacker who replaces firmware on an IoT device or injects code into a server process can operate undetected. Attestation creates cryptographic proof that every node is running authorized software.
+
+**Components:**
+
+### AttestationClaim
+A signed statement from a node about its current software state. The claim contains:
+- `node_uuid` — Which node is attesting
+- `state_hash` — SHA-256 of the node's firmware, OS, and config
+- `components` — What was hashed (["firmware", "os", "config"])
+- `timestamp` — When the claim was generated
+- `signature` — ed25519 signature over (uuid + state_hash + timestamp)
+
+Tampering with ANY field after signing invalidates the signature. This prevents spoofing.
+
+### AttestationManager
+The verification engine. Checks three things:
+1. **Signature** — Claim is signed by the node's ed25519 key (not spoofed)
+2. **Freshness** — Claim timestamp is within 5 minutes (prevents replay)
+3. **Baseline match** — State hash matches the registered known-good baseline
+
+If all three pass → PASSED. If signature or baseline fail → FAILED. If claim is stale → EXPIRED.
+
+### AttestationPolicy
+Controls how strict quarantine enforcement is:
+- **STRICT** — Any failure → quarantine immediately
+- **MODERATE** — 2+ consecutive failures → quarantine (gives one chance for false positives)
+- **PERMISSIVE** — Log only, no automatic quarantine (for dev environments)
+
+### BaselineEntry
+A registered known-good state hash for a node type. When firmware updates, the admin registers a new baseline and the old one is marked as superseded.
+
+### compute_state_hash()
+Utility function that hashes one or more component hashes into a final state hash. This is what nodes call at boot time: hash(firmware + os + config) → state_hash.
+
+### Failure tracking
+Consecutive failures are counted per node. A successful attestation resets the counter. This feeds into `should_quarantine()` which the Self-Healing Mesh calls to decide whether to transition a node.
+
+---
+
 ## Remaining Work (Phase 1)
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-106 | Identity Fabric — Attestation | Nodes prove they are who they claim to be |
 | B-107 | Identity Fabric — Certificate Lifecycle | X.509 cert issuance, renewal, revocation |
 | B-108 | Audit Chain | Tamper-evident SHA-256 hash chain, 6-year retention |
 | B-109 | Access Control | RBAC, role-portal mapping, scoped sessions, MFA |
