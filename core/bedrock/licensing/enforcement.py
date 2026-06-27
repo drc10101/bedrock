@@ -57,6 +57,16 @@ TIER_PRICING = {
     LicenseTier.ENTERPRISE: "custom",
 }
 
+# Stripe product and price IDs (test mode)
+STRIPE_PRODUCT_ID = "prod_UmfKFai4NjHXyy"
+
+STRIPE_PRICES = {
+    LicenseTier.DEVELOPER: {
+        "individual": "price_1Tn5zvGfRLc2oae00cPNY0K0",  # $99/yr
+        "team": "price_1Tn5zvGfRLc2oae0MNqHaBMB",       # $499/yr
+    },
+}
+
 # Feature flags per tier
 TIER_FEATURES = {
     LicenseTier.DEVELOPER: [

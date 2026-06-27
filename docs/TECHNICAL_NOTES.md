@@ -1822,3 +1822,30 @@ Entry points: `python -m bedrock` or `bedrock` console script.
 - `core/pyproject.toml` — added `[project.scripts] bedrock = "bedrock.cli:main"`
 
 **Test count:** 930 total (788 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-323: Stripe Product & Developer License Pricing
+
+**Status:** Complete
+
+Stripe product and pricing created in test mode for developer license tiers.
+
+### Stripe Resources
+
+- **Product:** `prod_UmfKFai4NjHXyy` — "Bedrock"
+  - Description: Identity-based security framework for developers
+  - Metadata: `product=bedrock`, `type=license`
+
+- **Developer License (Individual):** `price_1Tn5zvGfRLc2oae00cPNY0K0` — $99/year
+  - Metadata: `tier=developer`, `max_nodes=3`, `max_devs=5`
+
+- **Professional License (Team):** `price_1Tn5zvGfRLc2oae0MNqHaBMB` — $499/year
+  - Metadata: `tier=professional`, `max_nodes=10`, `max_devs=25`
+
+### Code Changes
+
+- `bedrock.licensing.enforcement` — added `STRIPE_PRODUCT_ID` and `STRIPE_PRICES` constants
+- `bedrock.licensing.__init__` — exported new Stripe constants
+
+**Test count:** 930 total (788 Python + 20 SDK + 122 TypeScript), all passing.

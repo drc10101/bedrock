@@ -23,6 +23,8 @@ from bedrock.licensing.enforcement import (
     NODE_LIMITS,
     TIER_PRICING,
     TIER_FEATURES,
+    STRIPE_PRODUCT_ID,
+    STRIPE_PRICES,
 )
 from bedrock.licensing.keygen import (
     LicenseKeygen,
@@ -39,6 +41,8 @@ __all__ = [
     "NODE_LIMITS",
     "TIER_PRICING",
     "TIER_FEATURES",
+    "STRIPE_PRODUCT_ID",
+    "STRIPE_PRICES",
     "LicenseKeygen",
     "SigningKey",
 ]
