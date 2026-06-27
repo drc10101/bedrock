@@ -277,8 +277,12 @@ Each level is deterministic: same master key + same info string = same derived k
 | Data Separation | 57 | Passing |
 | Mesh State Machine | 14 | Passing |
 | Node | 7 | Passing |
+| Node Registration | 50 | Passing |
+| Attestation | 29 | Passing |
+| Certificates | 30 | Passing |
+| Audit Chain | 41 | Passing |
 | Core | 25 | Passing |
-| **Total** | **263** | **All passing** |
+| **Total** | **304** | **All passing** |
 
 ---
 
@@ -429,11 +433,60 @@ Raised when `issue_certificate()` would exceed the licensed node count. The erro
 
 ---
 
+## B-108: Audit Chain
+
+**What:** Every action in a Bedrock network is logged to a tamper-evident SHA-256 hash chain. Each entry's hash is computed from the previous entry's hash plus the entry data. Any modification to a past entry invalidates all subsequent hashes — making it cryptographically impossible to alter audit logs undetected.
+
+**Why:** Regulatory compliance (HIPAA, SOC 2, PCI-DSS) requires immutable audit trails. But traditional audit logs can be silently modified by anyone with database access. The hash chain makes tampering detectable: you can verify the entire chain's integrity with a single pass, and any break proves exactly where the tampering happened.
+
+**Components:**
+
+### AuditEntry
+A single entry in the chain. Key fields:
+- `timestamp` — UTC timestamp of the action
+- `action` — What happened (e.g., "node.register", "field.encrypt", "consent.approve")
+- `actor_id` — Who did it (node UUID or user ID)
+- `target_id` — What was acted upon (record ID, node ID)
+- `silo` — Which data silo this relates to
+- `details` — Arbitrary key-value metadata
+- `prev_hash` — SHA-256 hash of the previous entry (chain link)
+- `entry_hash` — SHA-256 hash of this entry (computed on append)
+- `entry_index` — Position in the chain (0-indexed)
+
+Hash computation: `SHA-256(prev_hash + action + actor_id + target_id + silo + timestamp + details_json)`. Sorted JSON for deterministic hashing.
+
+### AuditAction (enum)
+Standard action types following `category.operation` format:
+- Node lifecycle: node.register, node.attest, node.quarantine, node.revoke, node.heal
+- Certificate: cert.issue, cert.renew, cert.revoke
+- Encryption: field.encrypt, field.decrypt, e2ee.send, e2ee.receive
+- Key management: key.rotate, key.retire
+- Consent: consent.request, consent.approve, consent.deny, consent.revoke
+- Silo access: silo.access
+- Auth: auth.login, auth.logout, auth.mfa, auth.fail
+- Chain itself: chain.verify, chain.export
+- Custom: custom.action
+
+### AuditChain
+Append-only SHA-256 hash chain:
+- `append()` — Creates entry with computed hash, chains to previous entry
+- `verify()` — Re-hashes every entry, confirms chain integrity. Detects any tampering.
+- `verify_range()` — Incremental verification for large chains
+- `query()` — Multi-filter search (action, actor, target, silo, time range)
+- `export()` — JSONL or JSON export for compliance reporting
+- `import_chain()` — Reconstruct from export, verifies integrity on import
+- `head_hash` / `tail_hash` — Chain head (most recent) and genesis hash
+
+Genesis hash: 64 zero hex chars (`"0" * 64`). Empty chain is valid.
+
+6-year retention per HIPAA/SOC 2/PCI-DSS requirements.
+
+---
+
 ## Remaining Work (Phase 1)
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-108 | Audit Chain | Tamper-evident SHA-256 hash chain, 6-year retention |
 | B-109 | Access Control | RBAC, role-portal mapping, scoped sessions, MFA |
 | B-110 | Transport Security | TLS termination, E2EE delivery, rate limiting |
 | B-111 | Self-Healing Mesh | Attack detection, node isolation, automatic rerouting |
@@ -441,4 +494,4 @@ Raised when `issue_certificate()` would exceed the licensed node count. The erro
 
 ---
 
-*Last updated: B-107 complete, 263 tests passing*
+*Last updated: B-108 complete, 304 tests passing*

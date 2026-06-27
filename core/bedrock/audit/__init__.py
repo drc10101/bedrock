@@ -7,6 +7,6 @@ Every action is appended to an immutable chain.
 Trade Secret — InFill Systems, LLC.
 """
 
-from bedrock.audit.chain import AuditChain, AuditEntry
+from bedrock.audit.chain import AuditChain, AuditEntry, AuditAction, GENESIS_HASH
 
-__all__ = ["AuditChain", "AuditEntry"]
+__all__ = ["AuditChain", "AuditEntry", "AuditAction", "GENESIS_HASH"]
