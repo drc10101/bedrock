@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "bedrock-sdk"
+version = "1.0.0"
+description = "Official Python SDK for Bedrock Core — identity-first encrypted application platform"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+authors = [{name = "InFill Systems, LLC"}]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://bedrock.dev"
+
+[tool.setuptools.packages.find]
+include = ["bedrock_sdk*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

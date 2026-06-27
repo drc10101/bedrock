@@ -1538,3 +1538,45 @@ Files:
 - `tests/test_mesh_integration.py` (310 lines, 23 tests)
 
 **Test count:** 751 total (629 Python + 122 TypeScript), all passing.
+
+---
+
+## B-317: Bedrock Python SDK
+
+**Status:** Complete
+
+Official Python SDK client library for Bedrock Core. Any licensed developer
+installs this package and connects to a Bedrock instance with their license key.
+
+Architecture:
+- `BedrockClient` — main entry point, config/auth/connection management
+- Namespaced sub-clients: `nodes`, `certificates`, `silos`, `consent`,
+  `encryption`, `audit`, `mesh`, `license`
+- Auth via `Authorization: Bearer <license_key>` header
+- Exception hierarchy: BedrockError → AuthenticationError, LicenseError,
+  NotFoundError, ValidationError, QuotaExceededError, MeshError
+
+Sub-client methods:
+- `_NodeClient`: register, list, get
+- `_CertificateClient`: issue, revoke, check
+- `_SiloClient`: create, list
+- `_ConsentClient`: request, approve, deny
+- `_EncryptionClient`: encrypt, decrypt
+- `_AuditClient`: query, verify
+- `_MeshClient`: get_state, flag, heal
+- `_LicenseClient`: validate, features
+
+Package structure (sdk-python/):
+- `bedrock_sdk/__init__.py` — exports, version 1.0.0
+- `bedrock_sdk/client.py` — BedrockClient + all sub-clients
+- `bedrock_sdk/exceptions.py` — exception hierarchy
+- `pyproject.toml` — build config, Python 3.11+
+- `tests/test_sdk_client.py` — 20 tests (structural + integration against live server)
+
+Key design decisions:
+- License key sent as Bearer token (matches server auth)
+- Standard library only (no requests dependency) — urllib.request
+- License validate uses POST (server endpoint requires body with license_key)
+- SDK tests spin up real HTTP server via create_server()
+
+**Test count:** 771 total (629 Python + 20 SDK + 122 TypeScript), all passing.
