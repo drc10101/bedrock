@@ -877,9 +877,10 @@ Files created:
 | Defense Template | 48 | All passing |
 | Licensing System | 65 | All passing |
 | InFill Adapter | 51 | All passing |
-| **Total** | **866** | **All passing** |
+| TS SDK (expanded) | 122 | All passing |
+| **Total** | **920** | **All passing** |
 
-*Last updated: B-307 complete, 866 total tests passing*
+|*Last updated: B-310 complete, 920 total tests passing*|
 
 ---
 
@@ -1191,5 +1192,44 @@ Files:
 - `integrations/infill/adapter.py` (683 lines)
 - `integrations/infill/test_adapter.py` (381 lines, 51 tests)
 - `integrations/infill/__init__.py`
+
+---
+
+## B-310: TypeScript SDK Expansion
+
+**Status:** Complete
+
+Expanded the Bedrock TypeScript SDK from 68 to 122 tests with new modules and
+deeper coverage:
+
+New modules:
+1. **LicensingModule** — Two-tier license enforcement (Developer/Starter/Business/Enterprise/Custom),
+   offline validation, feature gating, node limits, upgrade/revoke lifecycle
+2. **SiloModule** — Data separation silo management: create, store, retrieve, query,
+   delete-record (right to be forgotten), drop silo, entry counts
+
+Expanded existing modules:
+3. **IdentityModule** — Attestation support: policy setting, claim submission,
+   verification, node listing, state transitions, capability scope checking
+4. **EncryptionModule** — Batch encrypt/decrypt, silo-specific key derivation,
+   key version tracking/history, rotation clears derived keys
+5. **DataModule** — Consent deny flow, consent expiry, list by status,
+   anonymous ID silo binding, resolve count tracking, identity removal cleanup
+
+Bug fixes:
+- Fixed `transport.ts` Map iteration for TS strict mode
+- Fixed `encryption.ts` BufferSource compatibility for Web Crypto API
+- Fixed all TS strict mode warnings (unused params, imports)
+
+Files:
+- `sdk-ts/src/licensing.ts` (227 lines, 13 tests)
+- `sdk-ts/src/silo.ts` (182 lines, 13 tests)
+- `sdk-ts/src/identity.ts` (expanded, 11 tests)
+- `sdk-ts/src/encryption.ts` (expanded, 7 tests)
+- `sdk-ts/src/data.ts` (expanded, 10 tests)
+- `sdk-ts/src/transport.ts` (bug fixes)
+- `sdk-ts/src/client.ts` (cleaned imports)
+- `sdk-ts/src/index.ts` (updated exports)
+- `sdk-ts/tests/expanded.test.ts` (54 new integration tests)
 - `tests/test_licensing.py` (583 lines, 65 tests)
 - `docs/developer-portal/tutorials/defense-tutorial.md`

@@ -4,9 +4,9 @@
  * Trade Secret — InFill Systems, LLC. All rights reserved.
  */
 
-import type { ConsentEvent } from './types';
 import { ConsentStatus } from './types';
 
+/** Consent record with full lifecycle tracking. */
 interface ConsentRecord {
   consentId: string;
   requestingNodeId: string;
@@ -17,14 +17,23 @@ interface ConsentRecord {
   reason: string;
   status: ConsentStatus;
   dataOwnerId: string | null;
+  approverId: string | null;
+  denierId: string | null;
+  denialReason: string | null;
   expiresAt: Date | null;
   createdAt: Date;
+  approvedAt: Date | null;
+  revokedAt: Date | null;
 }
 
+/** Anonymous ID mapping with silo binding. */
 interface AnonIdMapping {
   anonymousId: string;
   realId: string;
   silo: string;
+  createdAt: Date;
+  lastResolved: Date | null;
+  resolveCount: number;
 }
 
 /**
@@ -35,6 +44,8 @@ export class DataModule {
   private _anonIds: Map<string, AnonIdMapping> = new Map();
   private _realToAnon: Map<string, Map<string, string>> = new Map();
   private _consentCounter: number = 0;
+
+  // --- Consent ---
 
   /**
    * Request cross-silo data access consent.
@@ -58,8 +69,13 @@ export class DataModule {
       reason,
       status: ConsentStatus.PENDING,
       dataOwnerId: null,
+      approverId: null,
+      denierId: null,
+      denialReason: null,
       expiresAt: null,
       createdAt: new Date(),
+      approvedAt: null,
+      revokedAt: null,
     };
     this._consents.set(consentId, record);
     return consentId;
@@ -75,7 +91,23 @@ export class DataModule {
     }
     record.status = ConsentStatus.APPROVED;
     record.dataOwnerId = dataOwnerId;
+    record.approverId = dataOwnerId;
     record.expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+    record.approvedAt = new Date();
+    return true;
+  }
+
+  /**
+   * Deny a pending consent request.
+   */
+  denyConsent(consentId: string, denierId: string, reason: string = ''): boolean {
+    const record = this._consents.get(consentId);
+    if (!record || record.status !== ConsentStatus.PENDING) {
+      return false;
+    }
+    record.status = ConsentStatus.DENIED;
+    record.denierId = denierId;
+    record.denialReason = reason;
     return true;
   }
 
@@ -91,21 +123,49 @@ export class DataModule {
   }
 
   /**
+   * Get consent details.
+   */
+  getConsent(consentId: string): ConsentRecord | undefined {
+    return this._consents.get(consentId);
+  }
+
+  /**
    * Revoke a previously approved consent.
    */
   revokeConsent(consentId: string): boolean {
     const record = this._consents.get(consentId);
     if (!record) return false;
     record.status = ConsentStatus.REVOKED;
+    record.revokedAt = new Date();
     return true;
   }
 
   /**
-   * Create an anonymous ID mapping for a real identity.
+   * List consents filtered by status.
+   */
+  listConsents(status?: ConsentStatus): ConsentRecord[] {
+    const records = Array.from(this._consents.values());
+    if (status) {
+      return records.filter((r) => r.status === status);
+    }
+    return records;
+  }
+
+  // --- Anonymous IDs ---
+
+  /**
+   * Create an anonymous ID mapping for a real identity, bound to a silo.
    */
   createAnonymousId(realId: string, silo: string): string {
     const anonymousId = `anon-${crypto.randomUUID().slice(0, 16)}`;
-    const mapping: AnonIdMapping = { anonymousId, realId, silo };
+    const mapping: AnonIdMapping = {
+      anonymousId,
+      realId,
+      silo,
+      createdAt: new Date(),
+      lastResolved: null,
+      resolveCount: 0,
+    };
     this._anonIds.set(anonymousId, mapping);
 
     if (!this._realToAnon.has(realId)) {
@@ -121,7 +181,31 @@ export class DataModule {
    */
   resolveAnonymousId(anonymousId: string): string | null {
     const mapping = this._anonIds.get(anonymousId);
-    return mapping?.realId ?? null;
+    if (!mapping) return null;
+    mapping.resolveCount++;
+    mapping.lastResolved = new Date();
+    return mapping.realId;
+  }
+
+  /**
+   * Get anonymous ID for a real identity in a specific silo.
+   */
+  getAnonymousId(realId: string, silo: string): string | null {
+    const siloMap = this._realToAnon.get(realId);
+    return siloMap?.get(silo) ?? null;
+  }
+
+  /**
+   * List all silo bindings for a real identity.
+   */
+  listSiloBindings(realId: string): Array<{ silo: string; anonymousId: string }> {
+    const siloMap = this._realToAnon.get(realId);
+    if (!siloMap) return [];
+    const result: Array<{ silo: string; anonymousId: string }> = [];
+    siloMap.forEach((anonId, silo) => {
+      result.push({ silo, anonymousId: anonId });
+    });
+    return result;
   }
 
   /**
@@ -130,11 +214,18 @@ export class DataModule {
   removeIdentity(realId: string): boolean {
     const siloMap = this._realToAnon.get(realId);
     if (siloMap) {
-      for (const anonId of siloMap.values()) {
+      siloMap.forEach((anonId) => {
         this._anonIds.delete(anonId);
-      }
+      });
       this._realToAnon.delete(realId);
     }
     return true;
+  }
+
+  /**
+   * Get the resolve count for an anonymous ID.
+   */
+  getResolveCount(anonymousId: string): number {
+    return this._anonIds.get(anonymousId)?.resolveCount ?? 0;
   }
 }

@@ -5,7 +5,7 @@
  */
 
 import type {
-  Node, TLSConfig, HealingResult, CapabilityScope,
+  Node, HealingResult, CapabilityScope,
 } from './types';
 import {
   NodeState,
@@ -13,7 +13,6 @@ import {
   DowngradeStatus,
   RateLimitResult,
   SignalType,
-  DataCategory,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -93,7 +92,7 @@ export class TransportTLS {
   /**
    * Check rate limit for a node or IP.
    */
-  checkRateLimit(key: string): RateLimitResult {
+  checkRateLimit(_key: string): RateLimitResult {
     // Simplified — production would use a sliding window counter
     return RateLimitResult.ALLOWED;
   }
@@ -141,7 +140,7 @@ export class MeshModule {
   /**
    * Flag a node for suspicious behavior.
    */
-  flagNode(sourceId: string, targetId: string, signalType: string, details?: Record<string, unknown>): void {
+  flagNode(sourceId: string, targetId: string, signalType: string, _details?: Record<string, unknown>): void {
     if (!this._flags.has(targetId)) {
       this._flags.set(targetId, []);
     }
@@ -168,22 +167,21 @@ export class MeshModule {
   processFlags(): string[] {
     const quarantined: string[] = [];
 
-    for (const [nodeId, flags] of this._flags.entries()) {
+    this._flags.forEach((flags, nodeId) => {
       const sources = new Set(flags.map((f) => f.sourceId));
-      if (sources.size < this._consensusThreshold) continue;
-
-      const meshNode = this._nodes.get(nodeId);
-      if (!meshNode) continue;
-
-      // ACTIVE → SUSPECT → QUARANTINED
-      const currentState = meshNode.node.state;
-      if (currentState === NodeState.ACTIVE) {
-        meshNode.node = { ...meshNode.node, state: NodeState.SUSPECT };
-      } else if (currentState === NodeState.SUSPECT) {
-        meshNode.node = { ...meshNode.node, state: NodeState.QUARANTINED };
-        quarantined.push(nodeId);
+      if (sources.size >= this._consensusThreshold) {
+        const meshNode = this._nodes.get(nodeId);
+        if (meshNode) {
+          const currentState = meshNode.node.state;
+          if (currentState === NodeState.ACTIVE) {
+            meshNode.node = { ...meshNode.node, state: NodeState.SUSPECT };
+          } else if (currentState === NodeState.SUSPECT) {
+            meshNode.node = { ...meshNode.node, state: NodeState.QUARANTINED };
+            quarantined.push(nodeId);
+          }
+        }
       }
-    }
+    });
 
     return quarantined;
   }
@@ -191,7 +189,7 @@ export class MeshModule {
   /**
    * Begin healing a quarantined node.
    */
-  beginHealing(nodeId: string, reason: string = ''): HealingResult {
+  beginHealing(nodeId: string, _reason: string = ''): HealingResult {
     const meshNode = this._nodes.get(nodeId);
     if (!meshNode) {
       return { success: false, reason: 'Node not found', newState: NodeState.QUARANTINED };

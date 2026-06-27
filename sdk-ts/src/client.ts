@@ -7,8 +7,8 @@
  * Trade Secret — InFill Systems, LLC. All rights reserved.
  */
 
-import type { BedrockConfig, Node, Certificate, CapabilityScope, KeyPair, ConsentEvent, AuditEntry, Session, TLSConfig as TLSConfigType, HealingResult } from './types';
-import { DEFAULT_DEV_CONFIG, DEFAULT_PROD_CONFIG } from './types';
+import type { BedrockConfig } from './types';
+import { DEFAULT_DEV_CONFIG } from './types';
 import { IdentityModule } from './identity';
 import { EncryptionModule } from './encryption';
 import { DataModule } from './data';

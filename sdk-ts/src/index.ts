@@ -1,7 +1,5 @@
 /**
- * Bedrock SDK — Identity-based security framework for TypeScript/JavaScript.
- *
- * Every node is a user. Everything between is encrypted at rest.
+ * Bedrock TypeScript SDK — Module exports.
  *
  * Trade Secret — InFill Systems, LLC. All rights reserved.
  */
@@ -9,20 +7,14 @@
 export { BedrockClient } from './client';
 export { IdentityModule } from './identity';
 export { EncryptionModule } from './encryption';
+export type { KeyVersion, SiloKeyResult } from './encryption';
 export { DataModule } from './data';
 export { AuditModule } from './audit';
 export { AccessModule } from './access';
-export { TransportModule } from './transport';
-
-export type {
-  NodeID, Node, CapabilityScope, Certificate, EncryptionResult,
-  KeyPair, ConsentEvent, AuditEntry, Session, BedrockConfig,
-  TLSConfig, HealingResult,
-} from './types';
-
-export {
-  NodeState, DataCategory, CertificateStatus, LicenseTier,
-  AttestationPolicy, ConsentStatus, Role, Portal, Permission,
-  TLSVersion, DowngradeStatus, RateLimitResult, SignalType,
-  DEFAULT_DEV_CONFIG, DEFAULT_PROD_CONFIG,
-} from './types';
+export { TransportModule, TransportTLS, MeshModule } from './transport';
+export { LicensingModule } from './licensing';
+export type { LicenseValidationResult, LicenseDetails } from './licensing';
+export { SiloModule } from './silo';
+export type { SiloConfig, SiloEntry } from './silo';
+export type { AttestationResult, AttestationClaim } from './identity';
+export * from './types';
