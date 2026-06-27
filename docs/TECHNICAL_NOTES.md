@@ -1707,3 +1707,53 @@ Breaking change: `bedrock.server` is now a package, not a module.
 All imports (`from bedrock.server import ...`) still work via __init__.py.
 
 **Test count:** 872 total (730 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-321: Rate Limiting & Usage Metering
+
+**Status:** Complete
+
+Per-tier rate limiting and API usage metering for the Bedrock server. Every request
+is rate-limited by the authenticated key's license tier, and all API usage is tracked
+for billing and analytics.
+
+### Components
+
+**`bedrock.metering` package:**
+
+- **`LicenseTier`** — Enum: developer, starter, business, enterprise
+- **`TierLimits`** — Per-tier rate limit config (requests/min, burst, monthly cap, violation thresholds)
+- **`TIER_LIMITS`** — Pre-configured limits per tier:
+  - Developer: 60/min, burst 10, 100K monthly
+  - Starter: 200/min, burst 30, 500K monthly
+  - Business: 600/min, burst 100, 5M monthly
+  - Enterprise: 2000/min, burst 500, unlimited monthly
+- **`UsageMeter`** — Sliding-window rate limiter + usage tracker:
+  - `check_rate_limit(key, tier)` → (allowed, reason) with throttled/blocked states
+  - `record_usage()` — per-request: endpoint, method, status, response time, bytes
+  - `get_usage_summary()` — aggregated usage over N hours
+  - `get_monthly_usage()` — billing counter
+  - `reset_monthly()` — billing cycle reset
+  - `get_rate_limit_status()` — for X-RateLimit-* response headers
+- **`UsageRecord`** — Single API call record
+- **`UsageSummary`** — Aggregated usage with per-endpoint/method/status breakdowns
+
+**Server integration (`server/app.py`):**
+
+- `_handle_request()` now authenticates before routing, checks rate limits, returns 429 on rejection
+- All requests recorded via `UsageMeter.record_usage()` — endpoint, method, status code, response time
+- `_send_json()` adds `X-RateLimit-Minute-Remaining` and `X-RateLimit-Hour-Remaining` headers
+- New endpoint: `GET /api/v1/usage` — returns usage summary + rate limit status for authenticated key
+- `create_server()` accepts `enable_metering=True` (default on)
+- `run_server()` prints metering status on startup
+
+### Key Design Decisions
+
+- **Sliding window algorithm** — tracks timestamps in 1-minute and 1-hour windows, cleaned on each check
+- **Three-tier response** — ALLOWED (under burst), THROTTLED (over burst, under rate limit, request still processed), BLOCKED (over rate limit or violation threshold)
+- **Violation escalation** — repeated rate limit violations accumulate, block the key after threshold
+- **Monthly caps** — developer/starter/business have monthly limits, enterprise is unlimited
+- **Per-tier enforcement** — same UsageMeter instance serves all tiers with different limits per key
+
+**Test count:** 901 total (759 Python + 20 SDK + 122 TypeScript), all passing.

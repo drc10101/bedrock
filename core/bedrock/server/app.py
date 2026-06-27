@@ -54,6 +54,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
     # Config and core modules — set by server before serving
     config: CoreConfig = None
     api_keys: Dict[str, dict] = {}  # api_key -> {tier, node_id, roles}
+    usage_meter = None  # Set by create_server
 
     def log_message(self, format, *args):
         """Override to use structured logging."""
@@ -69,10 +70,17 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
     def _send_json(self, data: Any, status: int = 200):
-        """Send JSON response."""
+        """Send JSON response with rate limit headers."""
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("X-Request-Id", str(uuid.uuid4()))
+
+        # Add rate limit headers if metering is enabled
+        if self.usage_meter and hasattr(self, '_auth_key'):
+            rl_status = self.usage_meter.get_rate_limit_status(self._auth_key)
+            self.send_header("X-RateLimit-Minute-Remaining", str(rl_status.get("minute_remaining", 0)))
+            self.send_header("X-RateLimit-Hour-Remaining", str(rl_status.get("hour_remaining", 0)))
+
         self.end_headers()
         self.wfile.write(json.dumps(data, indent=2 if self.config and self.config.debug else None).encode())
 
@@ -142,6 +150,9 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
             # Licensing
             ("POST", "/api/v1/license/validate"): self._handle_validate_license,
+
+            # Usage metering
+            ("GET", "/api/v1/usage"): self._handle_usage,
         }
 
         # Try exact match first
@@ -182,18 +193,55 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         self._handle_request("DELETE")
 
     def _handle_request(self, method: str):
-        """Route and execute request with error handling."""
+        """Route and execute request with rate limiting, metering, and error handling."""
         parsed = urlparse(self.path)
         path = parsed.path
+        start_time = time.time()
+
+        # Authenticate and get identity (for rate limiting)
+        self._auth_key = None
+        try:
+            identity = self._authenticate()
+            if identity:
+                self._auth_key = identity.get("node_id", "")
+                tier = identity.get("tier", "developer")
+            else:
+                tier = "developer"
+        except Exception:
+            tier = "developer"
+
+        # Rate limit check
+        if self.usage_meter and self._auth_key:
+            allowed, reason = self.usage_meter.check_rate_limit(self._auth_key, tier)
+            if not allowed:
+                self._send_error(f"Rate limit exceeded: {reason}", 429)
+                return
+
         try:
             handler, params = self._route(method, path)
             handler(**params)
+            status_code = 200  # Default success
         except APIError as e:
             self._send_error(e.message, e.status)
+            status_code = e.status
         except json.JSONDecodeError:
             self._send_error("Invalid JSON body", 400)
+            status_code = 400
         except Exception as e:
             self._send_error(f"Internal error: {str(e)}", 500)
+            status_code = 500
+
+        # Record usage for metering
+        if self.usage_meter and self._auth_key:
+            elapsed_ms = (time.time() - start_time) * 1000
+            self.usage_meter.record_usage(
+                license_key=self._auth_key,
+                endpoint=path,
+                method=method,
+                status_code=status_code,
+                response_time_ms=elapsed_ms,
+                tier=tier,
+            )
 
     # ── Health Endpoints (no auth) ──
 
@@ -459,11 +507,47 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             "features": license_obj.features,
         })
 
+    # ── Usage Metering Endpoint ──
+
+    def _handle_usage(self):
+        """GET /api/v1/usage — Get usage summary for authenticated key."""
+        identity = self._require_auth()
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+
+        if not self.usage_meter:
+            self._send_json({"usage": {}, "message": "Usage metering not enabled"})
+            return
+
+        hours = float(params.get("hours", ["1"])[0])
+        license_key = self._auth_key or identity.get("node_id", "")
+        tier = identity.get("tier", "developer")
+
+        summary = self.usage_meter.get_usage_summary(license_key, tier, hours)
+        rl_status = self.usage_meter.get_rate_limit_status(license_key)
+
+        self._send_json({
+            "usage": {
+                "total_requests": summary.total_requests,
+                "requests_by_endpoint": summary.requests_by_endpoint,
+                "requests_by_method": summary.requests_by_method,
+                "requests_by_status": summary.requests_by_status,
+                "avg_response_time_ms": round(summary.avg_response_time_ms, 2),
+                "total_bytes_sent": summary.total_bytes_sent,
+                "throttled_count": summary.rate_limit_throttled,
+                "blocked_count": summary.rate_limit_blocked,
+                "monthly_used": self.usage_meter.get_monthly_usage(license_key),
+            },
+            "rate_limits": rl_status,
+            "period_hours": hours,
+        })
+
 
 def create_server(host: str = "0.0.0.0", port: int = 8443,
                   config: Optional[CoreConfig] = None,
                   api_keys: Optional[Dict[str, dict]] = None,
-                  tls_config: Optional[TLSConfig] = None) -> HTTPServer:
+                  tls_config: Optional[TLSConfig] = None,
+                  enable_metering: bool = True) -> HTTPServer:
     """Create and configure the Bedrock Core API server.
 
     Args:
@@ -474,9 +558,13 @@ def create_server(host: str = "0.0.0.0", port: int = 8443,
         tls_config: TLS configuration. If None, auto-configured:
             - Development: generates self-signed certs
             - Production: requires BEDROCK_TLS_CERT and BEDROCK_TLS_KEY env vars
+        enable_metering: Whether to enable usage metering and rate limiting.
     """
+    from bedrock.metering import UsageMeter
+
     BedrockAPIHandler.config = config or CoreConfig.from_env()
     BedrockAPIHandler.api_keys = api_keys or {}
+    BedrockAPIHandler.usage_meter = UsageMeter() if enable_metering else None
 
     server = HTTPServer((host, port), BedrockAPIHandler)
 
@@ -506,12 +594,15 @@ def create_server(host: str = "0.0.0.0", port: int = 8443,
 def run_server(host: str = "0.0.0.0", port: int = 8443,
                config: Optional[CoreConfig] = None,
                api_keys: Optional[Dict[str, dict]] = None,
-               tls_config: Optional[TLSConfig] = None):
+               tls_config: Optional[TLSConfig] = None,
+               enable_metering: bool = True):
     """Run the Bedrock Core API server."""
-    server = create_server(host, port, config, api_keys, tls_config)
+    server = create_server(host, port, config, api_keys, tls_config, enable_metering)
     effective_config = BedrockAPIHandler.config
+    metering_status = "enabled" if BedrockAPIHandler.usage_meter else "disabled"
     print(f"Environment: {effective_config.environment}")
     print(f"Tier: {effective_config.licensing.tier}")
+    print(f"Usage metering: {metering_status}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
