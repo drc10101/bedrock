@@ -729,11 +729,58 @@ Files created:
 |-------|-------|--------|
 | Core | 464 | All passing |
 | SDK | 36 | All passing |
-| **Total** | **500** | **All passing** |
+| Integration | 16 | All passing |
+| **Total** | **516** | **All passing** |
 
-*Last updated: B-208 complete, 552 tests passing*
+*Last updated: B-215 complete, 516 tests passing*
 
 ---
+
+## B-215: SDK Integration Tests (Python)
+
+**Status:** Complete
+
+End-to-end integration tests exercising full workflows through the Python SDK
+layer (BedrockClient). 8 workflow classes, 16 test methods covering:
+
+1. **Healthcare** — Register provider, encrypt PHI, consent-gated access,
+   audit trail, consent revocation
+2. **Banking** — RBAC with MFA-gated operations, role-based permission
+   enforcement, TOTP generation for test MFA
+3. **Defense/Mesh** — Self-healing mesh under attack, node flagging,
+   consensus-driven quarantine, two-round state transitions
+   (ACTIVE→SUSPECT→QUARANTINED), healing lifecycle
+4. **Multi-Silo** — Anonymous ID creation, cross-silo resolution,
+   right to be forgotten
+5. **Key Rotation** — Master key rotation preserves audit chain integrity
+6. **Production/Developer Mode** — TLS config, downgrade detection, mode defaults
+7. **Certificate Lifecycle** — Issue, revoke, error handling
+8. **Rate Limiting** — Independent key tracking
+
+Key API discoveries during integration testing:
+- `authenticate(username, password, portal)` — portal is required; valid values
+  are `patient`, `provider`, `admin`, `partner`
+- `check_permission(session, permission)` returns False without MFA even if
+  the capability is in the session list
+- `verify_mfa(session_id, totp_code)` — must use real TOTP generated from the
+  user's secret; cannot use a static code
+- `flag_node(source_id, target_id, signal_type)` — positional args, not
+  keyword args `source_node_id`/`target_node_id`
+- `SignalType` values: `credential_stuffing`, `lateral_movement`,
+  `unusual_volume`, `attestation_failure`, `path_anomaly`,
+  `certificate_anomaly`, `aad_mismatch`, `silent_node`
+- Mesh healing requires two `process_flags` rounds:
+  ACTIVE→SUSPECT→QUARANTINED
+- `begin_healing` only works on QUARANTINED nodes; requires
+  `healing_period_seconds=0` for instant completion in tests
+- `detect_downgrade()` and `check_rate_limit()` return plain strings,
+  not enum objects
+- `create_anonymous_id(real_id, silo)` takes 2 args, auto-generates the anon ID
+- Error message for AAD mismatch is `"AAD context mismatch"`, not just
+  `"AAD mismatch"`
+
+Files:
+- `sdk/tests/test_integration.py` — 16 integration tests
 
 ## B-208: TypeScript SDK Project Structure
 
@@ -776,9 +823,10 @@ Files created:
 
 | Suite | Tests | Status |
 |-------|-------|--------|
-| Core | 464 | All passing |
+| core | 464 | All passing |
 | Python SDK | 36 | All passing |
 | TypeScript SDK | 52 | All passing |
-| **Total** | **552** | **All passing** |
+| Integration (Python) | 16 | All passing |
+| **Total** | **568** | **All passing** |
 
-*Last updated: B-208 complete, 552 tests passing*
+*Last updated: B-215 complete, 568 tests passing*
