@@ -285,7 +285,8 @@ Each level is deterministic: same master key + same info string = same derived k
 | Transport Security | 41 | Passing |
 | Self-Healing Mesh | 46 | Passing |
 | Core | 25 | Passing |
-| **Total** | **442** | **All passing** |
+| Integration | 22 | Passing |
+| **Total** | **464** | **All passing** |
 
 ---
 
@@ -642,4 +643,46 @@ node isolation, automatic rerouting, healing protocol, and node state machine.
 
 ---
 
-*Last updated: B-111 complete, 442 tests passing*
+---
+
+## B-112: Core Integration Tests
+
+**Status:** Complete
+
+End-to-end cross-component tests validating that all Bedrock subsystems work
+together. 22 tests across 8 test classes:
+
+1. **TestFullDataLifecycle** (7 tests) — register node, encrypt/decrypt with AAD
+   binding, E2EE, consent request/approve/revoke, right to be forgotten, AAD
+   tamper detection
+2. **TestAttackSimulation** (2 tests) — full attack isolation lifecycle (5 nodes,
+   flag/consensus/quarantine/reroute), healing restoration (SUSPECT→QUARANTINED→
+   HEALING→ACTIVE with `healing_period_seconds=0` for test)
+3. **TestCertificateAccessControlIntegration** (2 tests) — certificate lifecycle
+   with RBAC (admin with MFA can issue/revoke, viewer cannot), developer tier
+   3-node limit enforcement
+4. **TestTransportSecurityIntegration** (3 tests) — TLS downgrade detection with
+   audit chain logging, rate limiting ALLOWED→THROTTLED→BLOCKED progression,
+   TLS config enforcement (developer vs production mode)
+5. **TestAttestationMeshIntegration** (2 tests) — failed attestation flags node
+   in mesh, strict vs permissive policy baselines
+6. **TestCrossComponentAuditTrail** (2 tests) — full audit trail across all
+   components with integrity verification, tamper detection via `_chain`
+   replacement breaking hash chain
+7. **TestAccessControlTransportIntegration** (3 tests) — portal isolation with
+   TLS configs, RBAC blocks viewer from admin endpoints, rate limiting per portal
+8. **TestPatientDataFlowIntegration** (1 test) — complete patient data flow:
+   register → consent → encrypt → audit → decrypt → revoke
+
+Key API discoveries during integration:
+- `AuditChain.append()` takes positional args `(action, actor_id, target_id, silo)`,
+  not an `AuditEntry` object. `len(chain)` counts appends only (no genesis).
+- `AccessController.check_permission()` requires a `Session` (with `mfa_verified=True`
+  for write operations), not a `UserAccount`.
+- `SelfHealingMesh(healing_period_seconds=0)` needed for tests so healing completes
+  immediately (default 3600s wait).
+- `RateLimiter.check()` returns `THROTTLED` after burst, `BLOCKED` only after
+  `violation_threshold` violations at the minute limit.
+- `ConsentGate.check_consent()` returns `None` for non-existent or revoked consents.
+
+*Last updated: B-112 complete, 464 tests passing*
