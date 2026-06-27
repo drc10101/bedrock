@@ -281,8 +281,9 @@ Each level is deterministic: same master key + same info string = same derived k
 | Attestation | 29 | Passing |
 | Certificates | 30 | Passing |
 | Audit Chain | 41 | Passing |
+| Access Control | 51 | Passing |
 | Core | 25 | Passing |
-| **Total** | **304** | **All passing** |
+| **Total** | **355** | **All passing** |
 
 ---
 
@@ -483,15 +484,67 @@ Genesis hash: 64 zero hex chars (`"0" * 64`). Empty chain is valid.
 
 ---
 
+## B-109: Access Control
+
+**What:** Role-based access control (RBAC) with portal scoping, MFA, and account lockout. Every access decision is enforceable at the session level — not just "is this user authenticated?" but "is this session scoped to this portal, with these capabilities, verified by MFA?"
+
+**Why:** In Bedrock's multi-portal architecture, a patient portal user must never access admin resources, even with valid credentials. The access controller enforces this structurally: sessions are scoped to a single portal, roles are mapped to portals, and write operations require MFA verification.
+
+**Components:**
+
+### Role, Portal, Permission (enums)
+- **Role**: ADMIN, OPERATOR, VIEWER, DENIED (terminal revocation)
+- **Portal**: PATIENT, PROVIDER, ADMIN, PARTNER — sessions are scoped to one portal
+- **Permission**: 17 granular permissions following `category.operation` format (data.read, node.quarantine, cert.issue, etc.)
+
+### DEFAULT_ROLE_PERMISSIONS
+- ADMIN: all 17 permissions
+- OPERATOR: data read/write, consent, node management, cert issue, audit read
+- VIEWER: data read, consent request, audit read (read-only)
+- DENIED: no permissions
+
+### PORTAL_ROLE_COMPATIBILITY
+- PATIENT portal: VIEWER, OPERATOR, ADMIN
+- PROVIDER portal: VIEWER, OPERATOR, ADMIN
+- ADMIN portal: ADMIN only
+- PARTNER portal: VIEWER, OPERATOR (no admin access)
+A VIEWER cannot authenticate to the admin portal at all — structurally enforced.
+
+### Session
+- Scoped to a single portal with role-derived capabilities
+- 8-hour default TTL, auto-expiry
+- `is_valid()`: not expired, not DENIED role
+- `has_permission()`: checks role permission set
+- MFA verification tracked per-session
+- Serializable to dict for audit logging
+
+### UserAccount
+- SHA-256 hashed passwords
+- Per-user TOTP secret (hex-encoded, 32 bytes)
+- Failed attempt counter with progressive delay (0s, 1s, 2s, 5s, 10s)
+- Auto-lockout after 5 failed attempts (15-minute cooldown)
+- Manual lock/unlock for admin intervention
+
+### AccessController
+- `create_user()`: creates account with hashed password and random TOTP secret
+- `authenticate()`: validates credentials + portal compatibility, creates scoped session. Returns None on failure, raises PermissionError on locked account.
+- `verify_mfa()`: TOTP verification (RFC 4226, HMAC-SHA1, 30s steps, ±1 window for clock drift)
+- `check_permission()`: validates session + role + MFA requirement in one call
+- `lock_account()` / `unlock_account()`: admin actions for the Self-Healing Mesh
+- `end_session()`: explicit logout
+
+**MFA requirement**: Write operations (data.write, data.delete, data.export, consent.approve/deny/revoke, node.quarantine/revoke, cert.issue/revoke, admin.config, admin.user_manage) all require MFA verification. Read operations don't.
+
+---
+
 ## Remaining Work (Phase 1)
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-109 | Access Control | RBAC, role-portal mapping, scoped sessions, MFA |
 | B-110 | Transport Security | TLS termination, E2EE delivery, rate limiting |
 | B-111 | Self-Healing Mesh | Attack detection, node isolation, automatic rerouting |
 | B-112 | Core Integration Tests | End-to-end cross-component tests |
 
 ---
 
-*Last updated: B-108 complete, 304 tests passing*
+*Last updated: B-109 complete, 355 tests passing*
