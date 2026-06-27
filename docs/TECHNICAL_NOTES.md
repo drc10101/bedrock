@@ -729,10 +729,53 @@ Files created:
 |-------|-------|--------|
 | Core | 464 | All passing |
 | SDK | 36 | All passing |
-| Integration | 16 | All passing |
-| **Total** | **516** | **All passing** |
+| Integration (Python) | 16 | All passing |
+| Integration (TypeScript) | 16 | All passing |
+| **Total (Python)** | **516** | **All passing** |
+| **Total (TypeScript)** | **68** | **All passing** |
 
-*Last updated: B-215 complete, 516 tests passing*
+*Last updated: B-216 complete, 584 total tests passing*
+
+---
+
+## B-216: SDK Integration Tests (TypeScript)
+
+**Status:** Complete
+
+End-to-end integration tests exercising full workflows through the TypeScript SDK
+(BedrockClient). 8 workflow classes, 16 test methods covering:
+
+1. **Healthcare** — Register provider, encrypt PHI, consent-gated access,
+   audit trail, consent revocation
+2. **Banking** — RBAC with MFA, operator vs admin vs viewer permissions,
+   transaction encryption
+3. **Defense Mesh** — Node registration, flagging, consensus, two-round
+   quarantine (ACTIVE→SUSPECT→QUARANTINED), healing lifecycle
+4. **Multi-Silo Anonymous** — Anonymous IDs across silos, resolve/revoke,
+   right to be forgotten, cross-silo encryption
+5. **Key Rotation** — Master key rotation, audit chain integrity across
+   rotation, v2 ciphertext format
+6. **Production Mode** — Developer vs production config, TLS downgrade
+   detection (HTTP, TLS version, secure), rate limiting
+7. **Certificate Lifecycle** — Issue, revoke, error handling, audit trail
+8. **Rate Limiting** — Normal traffic allowed, independent key tracking
+
+Key API differences from Python SDK that surfaced during testing:
+- TS SDK methods use positional args, not keyword/object args
+- `encrypt`/`decrypt` are async (Web Crypto API)
+- `audit.log`/`audit.verify` are async (SHA-256 via Web Crypto)
+- `AccessModule.verifyMfa` is simplified — any code marks session verified
+- `TransportModule` has `.tls` and `.mesh` sub-modules (not flat methods)
+- `mesh.registerNode(node)` takes a Node object, not name+categories
+- `Portal.SYSTEM = 'system'` exists in TS (not in Python)
+- `CertificateStatus` enum: ACTIVE, EXPIRED, REVOKED (not NodeState)
+- `SignalType` enum differs: has PORT_SCAN, BRUTE_FORCE, PRIVILEGE_ESCALATION,
+  MAN_IN_THE_MIDDLE (Python has LATERAL_MOVEMENT, PATH_ANOMALY,
+  CERTIFICATE_ANOMALY, AAD_MISMATCH)
+
+Bug fix applied: `identity.ts` was creating certificates with
+`status: { value: 'active' } as any` instead of `CertificateStatus.ACTIVE`.
+Fixed to use the proper enum value.
 
 ---
 
@@ -827,6 +870,7 @@ Files created:
 | Python SDK | 36 | All passing |
 | TypeScript SDK | 52 | All passing |
 | Integration (Python) | 16 | All passing |
-| **Total** | **568** | **All passing** |
+| Integration (TypeScript) | 16 | All passing |
+| **Total** | **584** | **All passing** |
 
-*Last updated: B-215 complete, 568 tests passing*
+*Last updated: B-216 complete, 584 total tests passing*

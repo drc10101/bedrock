@@ -7,7 +7,7 @@
 import type {
   Node, NodeID, CapabilityScope, Certificate, DataCategory,
 } from './types';
-import { NodeState } from './types';
+import { NodeState, CertificateStatus } from './types';
 
 /**
  * Identity management: register nodes, manage certificates, scope capabilities.
@@ -63,7 +63,7 @@ export class IdentityModule {
       serialNumber: `cert-${++this._nodeCounter}`,
       nodeUuid,
       nodeName,
-      status: { value: 'active' } as any,
+      status: CertificateStatus.ACTIVE,
       issuedAt: now,
       expiresAt: expires,
       publicKeyHash,
@@ -80,7 +80,7 @@ export class IdentityModule {
     if (!cert) {
       throw new Error(`No certificate found for node: ${nodeUuid}`);
     }
-    const revoked: Certificate = { ...cert, status: { value: 'revoked' } as any };
+    const revoked: Certificate = { ...cert, status: CertificateStatus.REVOKED };
     this._certificates.set(nodeUuid, revoked);
     return revoked;
   }
