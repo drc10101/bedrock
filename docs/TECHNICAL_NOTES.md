@@ -1580,3 +1580,42 @@ Key design decisions:
 - SDK tests spin up real HTTP server via create_server()
 
 **Test count:** 771 total (629 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-318: License Key Generation & Signing
+
+**Status:** Complete
+
+Key management infrastructure for generating, signing, rotating, and revoking
+license keys. This is the authority-side component Bedrock uses to issue and
+manage developer licenses.
+
+New module: `core/bedrock/licensing/keygen.py`
+
+Components:
+- `SigningKey` — signing key with metadata, revocation, serialization
+- `LicenseKeygen` — key generation, license issuance, validation, rotation
+
+Key features:
+- `generate_signing_key()` — create 256-bit random signing keys
+- `issue_license()` — sign license keys with PBKDF2-HMAC-SHA256 (100K iterations)
+- `validate_license()` — verify signature against all active signing keys
+- `revoke_key()` — revoke a signing key (all its licenses fail validation)
+- `rotate_key()` — revoke old key, generate new (auto-incremented ID)
+- `re_sign_license()` — re-sign a license under a new key during rotation
+- `batch_issue()` — issue multiple licenses at once (developer onboarding)
+- `export_keys()` / `import_keys()` — backup/restore signing keys as JSON
+- Constant-time signature comparison (timing attack prevention)
+
+Signing algorithm: PBKDF2-HMAC-SHA256 with 100,000 iterations (not the simple
+HMAC from enforcement.py — keygen uses a stronger KDF for authority-side keys).
+The existing LicenseEnforcer uses simple HMAC for backward compatibility.
+
+Key lifecycle:
+1. Generate signing key → issue licenses
+2. On compromise: revoke key → all its licenses fail validation
+3. On rotation: revoke old key → re-sign licenses with new key
+4. Backup: export keys as JSON → import on new server
+
+**Test count:** 824 total (682 Python + 20 SDK + 122 TypeScript), all passing.
