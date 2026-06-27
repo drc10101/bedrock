@@ -876,9 +876,10 @@ Files created:
 | Investment Template | 45 | All passing |
 | Defense Template | 48 | All passing |
 | Licensing System | 65 | All passing |
-| **Total** | **815** | **All passing** |
+| InFill Adapter | 51 | All passing |
+| **Total** | **866** | **All passing** |
 
-*Last updated: B-308 complete, 815 total tests passing*
+*Last updated: B-307 complete, 866 total tests passing*
 
 ---
 
@@ -1141,5 +1142,54 @@ Format: `1:<base64url(payload)>:<base64url(hmac-sha256)>`
 Files:
 - `core/bedrock/licensing/enforcement.py` (382 lines)
 - `core/bedrock/licensing/__init__.py`
+- `tests/test_licensing.py` (694 lines, 65 tests)
+
+---
+
+## B-307: InFill Adapter on Bedrock Core
+
+**Status:** Complete
+
+Re-implementation of InFill's domain concepts as a Bedrock integration layer,
+mapping InFill operations to Bedrock core modules:
+
+### Architecture
+- Patient → NodeRegistry node + CertificateManager certificate
+- Intake data → FieldEncryptor per-field encryption in medical silo
+- PIR → ConsentGate consent flow (identity → medical)
+- ePRR → ConsentGate consent flow (medical → identity)
+- E2EE messaging → FieldEncryptor encrypt/decrypt for subject + body
+- Audit → AuditChain SHA-256 hash chain with action, actor_id, target_id, silo
+
+### API Mapping (InFill → Bedrock)
+- `register_patient()` → `NodeRegistry.register()` + `CertificateManager.issue_certificate()` + `FieldEncryptor.encrypt()` per-field
+- `create_intake()` → `FieldEncryptor.encrypt()` for medical silo storage
+- `submit_intake()` → `FieldEncryptor.encrypt()` for responses
+- `create_pir()` → `ConsentGate.request_consent()` with patient as data_owner
+- `approve_pir()` → `ConsentGate.approve_consent()` with data_owner_id
+- `deny_pir()` → `ConsentGate.deny_consent()` with data_owner_id
+- `create_eprr()` → `ConsentGate.request_consent()` for medical data release
+- `release_eprr()` → `ConsentGate.approve_consent()` + release token
+- `send_message()` → `FieldEncryptor.encrypt()` for subject + body
+- `decrypt_message()` → `FieldEncryptor.decrypt()` for subject + body
+- `get_audit_trail()` → `AuditChain.query()`
+- `verify_integrity()` → `AuditChain.verify()`
+
+### Test Coverage (51 tests)
+- Patient registration (6) — basic, PII, provider, node ID, certificate, multiple
+- Patient lookup (5) — by UUID, not found, by name, by email, not found
+- Data encryption (4) — decrypt identity, decrypt PII, nonexistent, no PII
+- Intake management (5) — create, submit, not found, get, get not found
+- PIR (6) — create, approve, deny, not found × 2, categories
+- ePRR (4) — create, release, not found, categories
+- E2EE messaging (3) — send, custom TTL, decrypt roundtrip
+- Audit trail (6) — registration, intake, PIR, PIR approval, message, integrity
+- Silo integration (6) — 3 silos initialized, categories × 3, encrypted storage, PII separate
+- Domain models (6) — enum values, default values
+
+Files:
+- `integrations/infill/adapter.py` (683 lines)
+- `integrations/infill/test_adapter.py` (381 lines, 51 tests)
+- `integrations/infill/__init__.py`
 - `tests/test_licensing.py` (583 lines, 65 tests)
 - `docs/developer-portal/tutorials/defense-tutorial.md`
