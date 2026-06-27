@@ -1757,3 +1757,68 @@ for billing and analytics.
 - **Per-tier enforcement** — same UsageMeter instance serves all tiers with different limits per key
 
 **Test count:** 901 total (759 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-322: Developer Onboarding CLI
+
+**Status:** Complete
+
+Command-line tool for developer onboarding and Bedrock instance management.
+Entry points: `python -m bedrock` or `bedrock` console script.
+
+### Commands
+
+**`bedrock init [directory]`** — Initialize a new Bedrock project:
+- Creates directory structure: config/, data/audit/, data/keys/, logs/
+- Generates `bedrock.json` config from environment
+- Generates 256-bit master encryption key (data/keys/master.key)
+- Generates HMAC-SHA256 signing key (data/keys/signing_keys.json)
+- Creates `.env.template` with all config vars
+
+**`bedrock serve [--host] [--port] [--no-metering]`** — Start API server:
+- Wraps `run_server()` with TLS auto-config and usage metering
+- `--no-metering` disables rate limiting and usage tracking
+
+**`bedrock keygen [--key-id]`** — Generate signing key:
+- Creates HMAC-SHA256 signing key for license issuance
+- Persists to signing_keys.json
+
+**`bedrock license issue --tier --licensee --nodes --days --features`** — Issue license:
+- Uses active signing key to issue a tiered license
+- Supports developer/starter/business/enterprise tiers
+
+**`bedrock license validate --key`** — Validate license key:
+- Parses and validates license format and signature
+- Returns tier, licensee, expiry, features
+
+**`bedrock license revoke --key-id --reason`** — Revoke signing key
+
+**`bedrock health [--json]`** — Run health checks:
+- Checks encryption, identity, audit, licensing subsystems
+- `--json` outputs machine-readable report
+
+**`bedrock status`** — Show config summary:
+- Version, environment, tier, all subsystem configs
+
+### Key Design Decisions
+
+- **argparse-based** — no external CLI dependency, works with Python stdlib
+- **`python -m bedrock`** entry point via `__main__.py`
+- **`bedrock` console script** via pyproject.toml `[project.scripts]`
+- **`LicenseKeygen.from_file()` / `export_keys_file()`** — convenience methods added for CLI file I/O
+- **`LicenseValidationError` caught gracefully** — CLI returns code 1 with human-readable error instead of traceback
+- **`SigningKey.is_active` is a property** — not a callable method
+
+### New Files
+
+- `core/bedrock/cli.py` — 400 lines, all commands
+- `core/bedrock/__main__.py` — entry point for `python -m bedrock`
+- `tests/test_cli.py` — 29 tests (parser, init, keygen, license, health, status)
+
+### Modified Files
+
+- `core/bedrock/licensing/keygen.py` — added `export_keys_file()` and `from_file()` classmethod
+- `core/pyproject.toml` — added `[project.scripts] bedrock = "bedrock.cli:main"`
+
+**Test count:** 930 total (788 Python + 20 SDK + 122 TypeScript), all passing.

@@ -40,6 +40,9 @@ dependencies = [
     "hashlib; sys_platform != 'win32'",
 ]
 
+[project.scripts]
+bedrock = "bedrock.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",

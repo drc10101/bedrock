@@ -384,6 +384,36 @@ class LicenseKeygen:
         keys_data = [k.to_dict() for k in self._keys.values()]
         return json.dumps({"keys": keys_data, "exported_at": time.time()}, indent=2)
 
+    def export_keys_file(self, path: "Path") -> None:
+        """Export signing keys to a file.
+
+        Args:
+            path: File path to write keys JSON.
+        """
+        from pathlib import Path as _Path
+        path = _Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(self.export_keys())
+
+    @classmethod
+    def from_file(cls, path: "Path") -> "LicenseKeygen":
+        """Load a LicenseKeygen from a keys file.
+
+        Args:
+            path: Path to signing keys JSON file.
+
+        Returns:
+            LicenseKeygen with loaded keys.
+        """
+        from pathlib import Path as _Path
+        path = _Path(path)
+        with open(path) as f:
+            data = f.read()
+        keygen = cls()
+        keygen.import_keys(data)
+        return keygen
+
     def import_keys(self, json_data: str) -> int:
         """Import signing keys from a JSON backup.
 
