@@ -278,7 +278,67 @@ Each level is deterministic: same master key + same info string = same derived k
 | Mesh State Machine | 14 | Passing |
 | Node | 7 | Passing |
 | Core | 25 | Passing |
-| **Total** | **159** | **All passing** |
+| **Total** | **204** | **All passing** |
+
+---
+
+## B-105: Identity Fabric — Node Registration
+
+**What:** Every node in a Bedrock network gets a cryptographic identity. Not just users — servers, containers, IoT devices, API gateways, everything. A compromised router sees only ciphertext because it has no identity scope to decrypt.
+
+**Why:** Traditional zero-trust gives identities to people. Bedrock extends identity to every compute node. This is the foundation of the Self-Healing Mesh — nodes can't participate without an identity, and compromised nodes can be isolated by revoking their identity.
+
+**Components:**
+
+### NodeID
+A UUID v7 (time-sortable) paired with an ed25519 public key (32 bytes). The public key is the node's cryptographic identity. The private key never leaves the node.
+
+**Key methods:**
+- `NodeID.generate()` — Generates a new UUID + ed25519 key pair
+- `NodeID.generate(private_key)` — Uses an existing key pair (for key recovery)
+- `public_key_hex()` — Hex representation for display/logging
+- `fingerprint()` — Short 16-char hex prefix for quick identification
+
+### Node
+A dataclass representing a node in the mesh. Contains:
+- `node_id` — Cryptographic identity (UUID + public key)
+- `name` — Human-readable identifier (must be unique in registry)
+- `node_type` — server, container, iot, gateway, client
+- `state` — Trust state in the Self-Healing Mesh (see below)
+- `capabilities` — What data categories this node can access
+- `attestation_baseline` — SHA-256 hash of known-good software state
+- `certificate_serial` / `certificate_expires` — X.509 certificate binding
+- `flags` — Neighbor consensus flags for mesh quarantine
+- `metadata` — Extensible key-value pairs
+
+**Trust state checks:**
+- `can_route()` — ACTIVE and SUSPECT nodes can route traffic
+- `can_relay()` — ACTIVE, SUSPECT, and HEALING nodes can relay (but HEALING can't decrypt)
+- `can_decrypt()` — Only ACTIVE and SUSPECT nodes can decrypt data
+- QUARANTINED nodes are fully isolated — no routing, no relay, no decrypt
+- REVOKED nodes are permanently removed
+
+### NodeRegistry
+The central registry for all nodes. Manages registration, lookup, and state transitions.
+
+**Key methods:**
+- `register(name, node_type, private_key, metadata)` — Register a new node with cryptographic identity
+- `get(uuid)` / `get_by_name(name)` / `get_by_public_key(key)` — Three lookup methods
+- `list_nodes(state, node_type)` — Filter nodes by state or type
+- `transition(uuid, new_state, reason)` — State machine transitions with enforcement
+- `verify_identity(uuid, public_key)` — Authenticate a node's claimed identity
+- `heartbeat(uuid)` — Record a node heartbeat
+- `unregister(uuid)` — Remove a node (triggers audit + cert revocation in production)
+
+**State transitions** (enforced, not suggestions):
+```
+ACTIVE → SUSPECT (neighbor flags) → REVOKED (compromised)
+SUSPECT → QUARANTINED (attestation failed) → HEALING (re-attesting)
+HEALING → ACTIVE (re-attestation passed) or QUARANTINED (failed again)
+Any state → REVOKED (terminal, no recovery)
+```
+
+Once REVOKED, a node cannot transition to any other state. This is the mesh's kill switch for compromised nodes.
 
 ---
 
@@ -286,7 +346,6 @@ Each level is deterministic: same master key + same info string = same derived k
 
 | Task | Component | Description |
 |------|-----------|-------------|
-| B-105 | Identity Fabric — Node Registration | Every node gets a cryptographic identity |
 | B-106 | Identity Fabric — Attestation | Nodes prove they are who they claim to be |
 | B-107 | Identity Fabric — Certificate Lifecycle | X.509 cert issuance, renewal, revocation |
 | B-108 | Audit Chain | Tamper-evident SHA-256 hash chain, 6-year retention |
