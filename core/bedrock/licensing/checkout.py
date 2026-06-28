@@ -89,7 +89,9 @@ def create_checkout_session(
 
     # Resolve price ID from environment
     price_map = {
-        CheckoutTier.DEVELOPER_INDIVIDUAL: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"),
+        CheckoutTier.DEVELOPER_INDIVIDUAL: os.environ.get(
+            "BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"
+        ),
         CheckoutTier.DEVELOPER_TEAM: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM"),
     }
     price_id = price_map.get(tier)
@@ -112,7 +114,7 @@ def create_checkout_session(
         session_metadata["product_id"] = product_id
 
     create_kwargs: dict[str, Any] = {
-        "mode": "subscription" if tier == CheckoutTier.DEVELOPER_TEAM else "payment",
+        "mode": "subscription",
         "line_items": line_items,
         "success_url": success_url,
         "cancel_url": cancel_url,
@@ -147,7 +149,9 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> dict[str, Any]:
     """
     webhook_secret = os.environ.get("BEDROCK_STRIPE_WEBHOOK_SECRET")
     if not webhook_secret:
-        raise ValueError("BEDROCK_STRIPE_WEBHOOK_SECRET environment variable is required")
+        raise ValueError(
+            "BEDROCK_STRIPE_WEBHOOK_SECRET environment variable is required"
+        )
 
     event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     return dict(event)
@@ -169,9 +173,9 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
     session = event["data"]["object"]
     metadata = session.get("metadata", {})
     tier_str = metadata.get("bedrock_tier", "developer_individual")
-    customer_email = session.get("customer_email", "") or session.get("customer_details", {}).get(
-        "email", ""
-    )
+    customer_email = session.get("customer_email", "") or session.get(
+        "customer_details", {}
+    ).get("email", "")
 
     # Map checkout tier to license tier
     tier_map = {
@@ -227,7 +231,7 @@ def create_pricing_links() -> dict[str, str]:
             continue
         try:
             session = stripe.checkout.Session.create(
-                mode="payment",
+                mode="subscription",
                 line_items=[{"price": price_id, "quantity": 1}],
                 success_url="https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
                 cancel_url="https://bedrock.dev/license/cancel",
