@@ -46,6 +46,7 @@ dev = [
     "mypy>=1.10",
     "black>=24.0",
     "isort>=5.13",
+    "httpx2>=0.28",
 ]
 sqlcipher = [
     "sqlcipher3>=0.5",
