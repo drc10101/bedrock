@@ -53,6 +53,7 @@ class _TestServer:
             config=config,
             api_keys=api_keys,
             tls_config=TLSConfig(enabled=False),  # No TLS for test client
+            db_path=":memory:",
         )
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()

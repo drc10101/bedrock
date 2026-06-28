@@ -337,10 +337,18 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             self._send_error("Persistence not configured", 503)
             return
 
-        node = self.persistent.registry.register(
-            name=body.get("node_name", "api-node"), node_type=body.get("node_type", "generic")
-        )
-        self.persistent.save_node(node)
+        # Look up existing node if node_uuid provided, otherwise register new
+        node_uuid = body.get("node_uuid")
+        if node_uuid:
+            node = self.persistent.registry.get(node_uuid)
+            if node is None:
+                self._send_error(f"Node {node_uuid} not found", 404)
+                return
+        else:
+            node = self.persistent.registry.register(
+                name=body.get("node_name", "api-node"), node_type=body.get("node_type", "generic")
+            )
+            self.persistent.save_node(node)
 
         cert = self.persistent.cert_manager.issue_certificate(
             node_uuid=node.node_id.uuid,
