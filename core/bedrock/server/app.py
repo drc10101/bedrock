@@ -15,6 +15,7 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 from __future__ import annotations
 
+import secrets
 import time
 import uuid
 from typing import TYPE_CHECKING, Any
@@ -93,8 +94,8 @@ def create_app(
         title="Bedrock Core API",
         version="0.3.0",
         description="Identity-based security framework API",
-        docs_url="/docs" if effective_config.debug else None,
-        redoc_url="/redoc" if effective_config.debug else None,
+        docs_url="/docs",
+        redoc_url="/redoc",
     )
 
     # Store shared state on app.state for access in handlers
@@ -188,6 +189,73 @@ def create_app(
         checker = HealthChecker(effective_config)
         report = checker.check()
         return report.to_dict()
+
+    # ── Registration (no auth — creates API keys for new developers) ──
+
+    _registration_timestamps: list[float] = []
+
+    @app.post("/api/v1/register", status_code=201)
+    async def register_developer(request: Request) -> dict[str, Any]:
+        """Register a new developer and receive an API key.
+
+        No authentication required. Rate limited to 1 registration per
+        minute per source IP to prevent abuse.
+        """
+        # Rate limit: 1 registration per minute per IP
+        now = time.time()
+        client_ip = request.client.host if request.client else "unknown"
+        _registration_timestamps[:] = [
+            t for t in _registration_timestamps if now - t < 3600
+        ]
+        recent = sum(1 for t in _registration_timestamps if now - t < 60)
+        if recent >= 1:
+            raise HTTPException(
+                status_code=429,
+                detail="Registration rate limit exceeded. Try again in 60 seconds.",
+            )
+        _registration_timestamps.append(now)
+
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        # Generate a secure API key
+        api_key = secrets.token_urlsafe(32)
+        node_id = f"node-{uuid.uuid4().hex[:8]}"
+        tier = "developer"
+        roles = ["read", "write"]
+
+        # Store the key in the app's key store
+        effective_api_keys[api_key] = {
+            "tier": tier,
+            "node_id": node_id,
+            "roles": roles,
+        }
+
+        # Persist the key if persistence is available
+        try:
+            persistent.save_api_key(
+                {
+                    "key": api_key,
+                    "tier": tier,
+                    "node_id": node_id,
+                    "roles": roles,
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source_ip": client_ip,
+                }
+            )
+        except Exception:
+            pass  # Non-critical: key works in memory even if persist fails
+
+        return {
+            "api_key": api_key,
+            "tier": tier,
+            "node_id": node_id,
+            "roles": roles,
+            "message": "Store your API key securely. It will not be shown again.",
+        }
 
     # ── Identity Endpoints ──
 

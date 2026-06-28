@@ -156,6 +156,20 @@ def cmd_serve(args: argparse.Namespace) -> int:
         except json.JSONDecodeError:
             print("Warning: BEDROCK_API_KEYS env var is not valid JSON, using empty keys")
 
+    # Restore previously registered API keys from persistence
+    db_path = getattr(args, "db_path", "bedrock.db")
+    from bedrock.storage.persistence import PersistentBedrock
+    from bedrock.storage.sqlite_backend import SQLiteBackend
+
+    persistent_loader = PersistentBedrock(storage=SQLiteBackend(db_path))
+    persistent_loader.restore_all()
+    restored_keys = persistent_loader.restore_api_keys()
+    if restored_keys:
+        # Env keys take precedence over restored keys
+        for key, value in restored_keys.items():
+            if key not in api_keys:
+                api_keys[key] = value
+
     print("Starting Bedrock API server...")
     print(f"  Host: {args.host}")
     print(f"  Port: {args.port}")

@@ -305,6 +305,29 @@ class PersistentBedrock:
                 continue
         return count
 
+    # --- API key persistence ---
+
+    def save_api_key(self, key_data: dict) -> None:
+        """Persist a registered API key to the database."""
+        self.storage.save_api_key(key_data)
+
+    def restore_api_keys(self) -> dict[str, dict]:
+        """Restore registered API keys from the database.
+
+        Returns the api_keys dict suitable for passing to create_app().
+        """
+        saved = self.storage.load_api_keys()
+        api_keys: dict[str, dict] = {}
+        for _key_text, data in saved.items():
+            key = data.get("key", "")
+            if key:
+                api_keys[key] = {
+                    "tier": data.get("tier", "developer"),
+                    "node_id": data.get("node_id", ""),
+                    "roles": data.get("roles", ["read", "write"]),
+                }
+        return api_keys
+
     # --- Bulk operations ---
 
     def save_all(self) -> dict[str, int]:

@@ -278,3 +278,12 @@ class SQLiteBackend:
     def load_signing_keys(self) -> dict[str, dict]:
         """Load all license signing keys."""
         return self.load_all("bedrock_licenses")
+
+    def save_api_key(self, key_data: dict) -> None:
+        """Save a registered API key."""
+        api_key = key_data.get("key", "")
+        self.save("bedrock_api_keys", api_key, key_data)
+
+    def load_api_keys(self) -> dict[str, dict]:
+        """Load all registered API keys."""
+        return self.load_all("bedrock_api_keys")

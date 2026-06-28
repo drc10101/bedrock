@@ -375,3 +375,42 @@ class TestAPIServer:
 
         err = NotFoundError("test")
         assert err.status == 404
+
+    # ── Registration endpoint ──
+
+    def test_register_returns_api_key(self):
+        """POST /api/v1/register returns a new API key."""
+        response = self.client.post("/api/v1/register")
+        assert response.status_code == 201
+        data = response.json()
+        assert "api_key" in data
+        assert data["api_key"]
+        assert data["tier"] == "developer"
+        assert "node_id" in data
+        assert "roles" in data
+        assert "read" in data["roles"]
+
+    def test_register_key_works_for_auth(self):
+        """A key from /register can authenticate to other endpoints."""
+        reg_response = self.client.post("/api/v1/register")
+        assert reg_response.status_code == 201
+        new_key = reg_response.json()["api_key"]
+
+        # Use the new key to list nodes
+        response = self.client.get("/api/v1/nodes", headers=self._headers(new_key))
+        assert response.status_code == 200
+
+    def test_register_rate_limited(self):
+        """Second registration within 60 seconds is rate limited."""
+        first = self.client.post("/api/v1/register")
+        assert first.status_code == 201
+
+        second = self.client.post("/api/v1/register")
+        assert second.status_code == 429
+
+    def test_register_with_empty_body(self):
+        """POST /api/v1/register with empty body still works."""
+        response = self.client.post(
+            "/api/v1/register", json={}
+        )
+        assert response.status_code == 201
