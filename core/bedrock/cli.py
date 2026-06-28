@@ -106,6 +106,14 @@ BEDROCK_DEV_MODE=true
 BEDROCK_TIER=developer
 BEDROCK_MASTER_KEY=<from data/keys/master.key>
 
+# License signing key (required in production)
+# BEDROCK_SIGNING_KEY=<your-signing-key>
+
+# Stripe integration (required for paid license billing)
+# BEDROCK_STRIPE_PRODUCT_ID=<your-stripe-product-id>
+# BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL=<your-stripe-price-id>
+# BEDROCK_STRIPE_PRICE_DEV_TEAM=<your-stripe-price-id>
+
 # TLS (production only)
 # BEDROCK_TLS_CERT=/path/to/cert.pem
 # BEDROCK_TLS_KEY=/path/to/key.pem

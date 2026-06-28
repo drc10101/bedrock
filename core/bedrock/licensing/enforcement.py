@@ -62,13 +62,15 @@ TIER_PRICING = {
     LicenseTier.ENTERPRISE: "custom",
 }
 
-# Stripe product and price IDs (test mode)
-STRIPE_PRODUCT_ID = "prod_UmfKFai4NjHXyy"
+# Stripe product and price IDs — loaded from environment at runtime.
+# Set BEDROCK_STRIPE_PRODUCT_ID and BEDROCK_STRIPE_PRICES_* in production.
+# These are NOT hardcoded to prevent exposing billing configuration in source.
+STRIPE_PRODUCT_ID = os.environ.get("BEDROCK_STRIPE_PRODUCT_ID", "")
 
 STRIPE_PRICES = {
     LicenseTier.DEVELOPER: {
-        "individual": "price_1Tn5zvGfRLc2oae00cPNY0K0",  # $99/yr
-        "team": "price_1Tn5zvGfRLc2oae0MNqHaBMB",       # $499/yr
+        "individual": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL", ""),
+        "team": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM", ""),
     },
 }
 
@@ -224,10 +226,28 @@ class LicenseLimitError(Exception):
     pass
 
 
-# Signing key for license validation (embedded in library).
-# In production, this would be a compiled-in key not easily extractable.
-# This is a HMAC key for offline signature verification.
-_LICENSE_SIGNING_KEY = b"bedrock-2026-license-signing-key-v1"
+# Signing key for license validation — loaded from environment at runtime.
+# Set BEDROCK_SIGNING_KEY in production. A default is generated for development
+# but MUST NOT be used to sign production licenses.
+_LICENSE_SIGNING_KEY: bytes | None = None
+
+
+def _get_signing_key() -> bytes:
+    """Load the license signing key from environment or generate a development key."""
+    global _LICENSE_SIGNING_KEY
+    if _LICENSE_SIGNING_KEY is not None:
+        return _LICENSE_SIGNING_KEY
+
+    env_key = os.environ.get("BEDROCK_SIGNING_KEY")
+    if env_key:
+        _LICENSE_SIGNING_KEY = env_key.encode("utf-8")
+    else:
+        import hashlib
+        # Development-only key derived from machine info.
+        # NOT suitable for production license signing.
+        dev_seed = f"bedrock-dev-{os.environ.get('USER', 'anonymous')}-{os.environ.get('HOSTNAME', 'localhost')}"
+        _LICENSE_SIGNING_KEY = hashlib.sha256(dev_seed.encode()).digest()
+    return _LICENSE_SIGNING_KEY
 
 
 class LicenseEnforcer:
@@ -241,8 +261,8 @@ class LicenseEnforcer:
     The license key is a signed payload verified with an embedded key.
     """
 
-    def __init__(self, signing_key: bytes = _LICENSE_SIGNING_KEY):
-        self._signing_key = signing_key
+    def __init__(self, signing_key: bytes | None = None):
+        self.signing_key = signing_key or _get_signing_key()
 
     def generate_license_key(self, tier: LicenseTier, issued_to: str = "",
                               max_nodes: Optional[int] = None,
@@ -289,7 +309,7 @@ class LicenseEnforcer:
 
         # Sign with HMAC-SHA256
         signature = hmac.new(
-            self._signing_key,
+            self.signing_key,
             payload_json.encode(),
             hashlib.sha256,
         ).hexdigest()
@@ -359,7 +379,7 @@ class LicenseEnforcer:
         # Decode and verify signature
         try:
             expected_signature = hmac.new(
-                self._signing_key,
+                self.signing_key,
                 payload_json.encode(),
                 hashlib.sha256,
             ).hexdigest()

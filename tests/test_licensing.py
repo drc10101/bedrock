@@ -293,7 +293,7 @@ class TestInvalidLicenseHandling:
         payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)
         payload_b64 = base64.urlsafe_b64encode(payload_json.encode()).decode()
         sig = hmac.new(
-            enforcer._signing_key,
+            enforcer.signing_key,
             payload_json.encode(),
             hashlib.sha256,
         ).hexdigest()
