@@ -315,7 +315,7 @@ class LicenseKeygen:
         try:
             payload_json = base64.urlsafe_b64decode(payload_b64).decode()
         except Exception as e:
-            raise LicenseValidationError(f"Invalid payload encoding: {e}")
+            raise LicenseValidationError(f"Invalid payload encoding: {e}") from None
 
         # Try each active signing key
         last_error = None
@@ -339,12 +339,12 @@ class LicenseKeygen:
                 try:
                     payload = json.loads(payload_json)
                 except json.JSONDecodeError as e:
-                    raise LicenseValidationError(f"Invalid payload JSON: {e}")
+                    raise LicenseValidationError(f"Invalid payload JSON: {e}") from None
 
                 try:
                     tier = LicenseTier(payload["tier"])
                 except (KeyError, ValueError) as e:
-                    raise LicenseValidationError(f"Invalid tier in license: {e}")
+                    raise LicenseValidationError(f"Invalid tier in license: {e}") from None
 
                 max_nodes = payload.get(
                     "max_nodes", NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
@@ -481,13 +481,13 @@ class LicenseKeygen:
         try:
             payload_json = base64.urlsafe_b64decode(payload_b64).decode()
         except Exception as e:
-            raise ValueError(f"Invalid payload encoding: {e}")
+            raise ValueError(f"Invalid payload encoding: {e}") from None
 
         # Update the key_id in the payload to the new signing key
         try:
             payload = json.loads(payload_json)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid payload JSON: {e}")
+            raise ValueError(f"Invalid payload JSON: {e}") from None
 
         payload["key_id"] = new_key.key_id
         payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)

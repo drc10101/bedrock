@@ -390,7 +390,7 @@ class LicenseEnforcer:
         try:
             payload_json = base64.urlsafe_b64decode(payload_b64).decode()
         except Exception as e:
-            raise LicenseValidationError(f"Invalid payload encoding: {e}")
+            raise LicenseValidationError(f"Invalid payload encoding: {e}") from None
 
         # Decode and verify signature
         try:
@@ -401,7 +401,7 @@ class LicenseEnforcer:
             ).hexdigest()
             provided_signature = base64.urlsafe_b64decode(signature_b64).decode()
         except Exception as e:
-            raise LicenseValidationError(f"Invalid signature encoding: {e}")
+            raise LicenseValidationError(f"Invalid signature encoding: {e}") from None
 
         if not hmac.compare_digest(expected_signature, provided_signature):
             raise LicenseValidationError("Invalid license key signature")
@@ -410,13 +410,13 @@ class LicenseEnforcer:
         try:
             payload = json.loads(payload_json)
         except json.JSONDecodeError as e:
-            raise LicenseValidationError(f"Invalid payload JSON: {e}")
+            raise LicenseValidationError(f"Invalid payload JSON: {e}") from None
 
         # Extract fields
         try:
             tier = LicenseTier(payload["tier"])
         except (KeyError, ValueError) as e:
-            raise LicenseValidationError(f"Invalid tier in license: {e}")
+            raise LicenseValidationError(f"Invalid tier in license: {e}") from None
 
         max_nodes = payload.get("max_nodes", NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)))
         if max_nodes == 0:
@@ -469,7 +469,7 @@ class LicenseEnforcer:
 
         return self.validate_license(license_key)
 
-    def can_issue_certificate(self, license: License, current_node_count: int) -> bool:
+    def can_issue_certificate(self, license_obj: License, current_node_count: int) -> bool:
         """Check if a new certificate can be issued within the license limit.
 
         Returns True if under the limit, False if at or over limit.
@@ -478,29 +478,29 @@ class LicenseEnforcer:
         Business: max 25 nodes.
         Enterprise: unlimited.
         """
-        if license.tier == LicenseTier.ENTERPRISE:
+        if license_obj.tier == LicenseTier.ENTERPRISE:
             return True
-        return current_node_count < license.max_nodes
+        return current_node_count < license_obj.max_nodes
 
-    def enforce_developer_mode(self, license: License) -> dict:
+    def enforce_developer_mode(self, license_obj: License) -> dict:
         """Get developer mode restrictions.
 
         Developer mode: localhost only, self-signed certs, 3 nodes max.
         Trial mode: same as developer, plus days_remaining and trial watermark.
         """
-        if not license.is_developer:
+        if not license_obj.is_developer:
             return {"dev_mode": False}
 
         result = {
             "dev_mode": True,
             "localhost_only": True,
             "self_signed_certs": True,
-            "max_nodes": min(license.max_nodes, 3),
+            "max_nodes": min(license_obj.max_nodes, 3),
             "no_production": True,
         }
 
-        if license.is_trial:
-            days_left = license.days_until_expiry or 0
+        if license_obj.is_trial:
+            days_left = license_obj.days_until_expiry or 0
             result["trial_mode"] = True
             result["trial_days_remaining"] = max(0, int(days_left))
 
@@ -520,17 +520,17 @@ class LicenseEnforcer:
             "pricing": TIER_PRICING.get(tier, TIER_PRICING.get(tier.value, {})),
         }
 
-    def validate_feature_access(self, license: License, feature: str) -> bool:
+    def validate_feature_access(self, license_obj: License, feature: str) -> bool:
         """Check if a license grants access to a specific feature.
 
         Args:
-            license: Validated License object
+            license_obj: Validated License object
             feature: Feature name to check
 
         Returns:
             True if the license includes the feature
         """
-        return license.has_feature(feature)
+        return license_obj.has_feature(feature)
 
     def get_upgrade_path(self, current_tier: LicenseTier) -> dict:
         """Get the upgrade path from the current tier.

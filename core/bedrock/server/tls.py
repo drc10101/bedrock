@@ -208,7 +208,7 @@ def generate_self_signed_cert_python(
         raise ImportError(
             "cryptography package required for self-signed cert generation. "
             "Install with: pip install cryptography"
-        )
+        ) from None
 
     # Generate private key
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

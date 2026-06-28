@@ -57,7 +57,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
     api_keys: dict[str, dict] = {}  # api_key -> {tier, node_id, roles}
     usage_meter = None  # Set by create_server
 
-    def log_message(self, format, *args):
+    def log_message(self, fmt, *args):
         """Override to use structured logging."""
         if self.config and self.config.log_format == "json":
             print(
@@ -67,12 +67,12 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
                         "level": "INFO",
                         "method": self.command,
                         "path": self.path,
-                        "message": format % args,
+                        "message": fmt % args,
                     }
                 )
             )
         else:
-            super().log_message(format, *args)
+            super().log_message(fmt, *args)
 
     def _send_json(self, data: Any, status: int = 200):
         """Send JSON response with rate limit headers."""

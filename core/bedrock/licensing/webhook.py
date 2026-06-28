@@ -34,8 +34,8 @@ from bedrock.licensing.checkout import (
 class WebhookHandler(BaseHTTPRequestHandler):
     """HTTP handler for Stripe webhook events."""
 
-    def log_message(self, format, *args):
-        print(f"[webhook] {time.strftime('%Y-%m-%d %H:%M:%S')} {format % args}")
+    def log_message(self, fmt, *args):
+        print(f"[webhook] {time.strftime('%Y-%m-%d %H:%M:%S')} {fmt % args}")
 
     def do_POST(self):
         if self.path != "/webhook/stripe":

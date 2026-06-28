@@ -15,6 +15,7 @@ so that no isolated node can continue to access protected resources.
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
+import contextlib
 from datetime import UTC, datetime
 
 from bedrock.audit.chain import AuditChain
@@ -315,10 +316,8 @@ class MeshIntegrator:
         events = []
 
         # Revoke through the mesh
-        try:
+        with contextlib.suppress(ValueError):
             self.mesh.revoke_node(node_id, reason=reason)
-        except ValueError:
-            pass  # Node may already be revoked
 
         event = self.on_revoke(node_id, reason)
         events.append(event)

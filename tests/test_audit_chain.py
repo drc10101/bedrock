@@ -256,7 +256,7 @@ class TestAuditChainExport:
         self.chain.append("field.encrypt", "server-01", "record-42", "medical")
 
     def test_export_jsonl(self):
-        exported = self.chain.export(format="jsonl")
+        exported = self.chain.export(fmt="jsonl")
         lines = exported.strip().split("\n")
         assert len(lines) == 3
 
@@ -267,7 +267,7 @@ class TestAuditChainExport:
             assert "entry_hash" in data
 
     def test_export_json(self):
-        exported = self.chain.export(format="json")
+        exported = self.chain.export(fmt="json")
         data = json.loads(exported)
         assert len(data) == 3
         assert data[0]["action"] == "node.register"
@@ -275,25 +275,25 @@ class TestAuditChainExport:
     def test_export_with_date_filter(self):
         start = datetime(2020, 1, 1, tzinfo=timezone.utc)
         end = datetime(2030, 1, 1, tzinfo=timezone.utc)
-        exported = self.chain.export(start_date=start, end_date=end, format="jsonl")
+        exported = self.chain.export(start_date=start, end_date=end, fmt="jsonl")
         lines = exported.strip().split("\n")
         assert len(lines) == 3
 
     def test_import_jsonl(self):
-        exported = self.chain.export(format="jsonl")
-        imported = AuditChain.import_chain(exported, format="jsonl")
+        exported = self.chain.export(fmt="jsonl")
+        imported = AuditChain.import_chain(exported, fmt="jsonl")
         assert len(imported) == 3
         assert imported.verify() is True
         assert imported.head_hash == self.chain.head_hash
 
     def test_import_json(self):
-        exported = self.chain.export(format="json")
-        imported = AuditChain.import_chain(exported, format="json")
+        exported = self.chain.export(fmt="json")
+        imported = AuditChain.import_chain(exported, fmt="json")
         assert len(imported) == 3
         assert imported.verify() is True
 
     def test_import_tampered_chain_fails(self):
-        exported = self.chain.export(format="jsonl")
+        exported = self.chain.export(fmt="jsonl")
         # Tamper with the first line
         lines = exported.strip().split("\n")
         data = json.loads(lines[0])
@@ -302,11 +302,11 @@ class TestAuditChainExport:
         tampered = "\n".join(lines)
 
         with pytest.raises(ValueError, match="integrity verification"):
-            AuditChain.import_chain(tampered, format="jsonl")
+            AuditChain.import_chain(tampered, fmt="jsonl")
 
     def test_export_import_roundtrip_preserves_data(self):
-        exported = self.chain.export(format="jsonl")
-        imported = AuditChain.import_chain(exported, format="jsonl")
+        exported = self.chain.export(fmt="jsonl")
+        imported = AuditChain.import_chain(exported, fmt="jsonl")
 
         for i in range(len(self.chain)):
             original = self.chain[i]

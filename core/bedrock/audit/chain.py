@@ -252,8 +252,7 @@ class AuditChain:
                 return False
             if i > start_index and entry.prev_hash != self._chain[i - 1].entry_hash:
                 return False
-            if i == start_index and start_index > 0:
-                if entry.prev_hash != self._chain[start_index - 1].entry_hash:
+            if i == start_index and start_index > 0 and entry.prev_hash != self._chain[start_index - 1].entry_hash:
                     return False
 
         return True
@@ -327,7 +326,7 @@ class AuditChain:
         self,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        format: str = "jsonl",
+        fmt: str = "jsonl",
     ) -> str:
         """Export audit chain entries for compliance reporting.
 
@@ -338,7 +337,7 @@ class AuditChain:
         Args:
             start_date: Earliest timestamp (None = from beginning)
             end_date: Latest timestamp (None = to end)
-            format: Export format ("jsonl" or "json")
+            fmt: Export format ("jsonl" or "json")
 
         Returns:
             String representation of the exported entries
@@ -349,23 +348,23 @@ class AuditChain:
         if end_date is not None:
             entries = [e for e in entries if e.timestamp <= end_date]
 
-        if format == "jsonl":
+        if fmt == "jsonl":
             lines = [json.dumps(e.to_dict(), separators=(",", ":")) for e in entries]
             return "\n".join(lines)
-        elif format == "json":
+        elif fmt == "json":
             return json.dumps([e.to_dict() for e in entries], indent=2)
         else:
-            raise ValueError(f"Unsupported export format: {format}")
+            raise ValueError(f"Unsupported export format: {fmt}")
 
     @classmethod
-    def import_chain(cls, data: str, format: str = "jsonl") -> "AuditChain":
+    def import_chain(cls, data: str, fmt: str = "jsonl") -> "AuditChain":
         """Import an audit chain from an export.
 
         Reconstructs the chain and verifies integrity.
 
         Args:
             data: Exported data string
-            format: Import format ("jsonl" or "json")
+            fmt: Import format ("jsonl" or "json")
 
         Returns:
             Reconstructed AuditChain
@@ -375,20 +374,20 @@ class AuditChain:
         """
         chain = cls()
 
-        if format == "jsonl":
+        if fmt == "jsonl":
             for line in data.strip().split("\n"):
                 if not line.strip():
                     continue
                 entry_dict = json.loads(line)
                 entry = AuditEntry.from_dict(entry_dict)
                 chain._chain.append(entry)
-        elif format == "json":
+        elif fmt == "json":
             entries = json.loads(data)
             for entry_dict in entries:
                 entry = AuditEntry.from_dict(entry_dict)
                 chain._chain.append(entry)
         else:
-            raise ValueError(f"Unsupported import format: {format}")
+            raise ValueError(f"Unsupported import format: {fmt}")
 
         # Set last hash from the final entry
         if chain._chain:

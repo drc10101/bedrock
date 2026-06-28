@@ -13,6 +13,7 @@ Provides:
 """
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -85,10 +86,8 @@ def cmd_init(args):
         with open(master_key_path, "w") as f:
             f.write(master_key)
         # Restrict permissions (Unix)
-        try:
+        with contextlib.suppress(OSError, AttributeError):
             os.chmod(master_key_path, 0o600)
-        except (OSError, AttributeError):
-            pass  # Windows doesn't support Unix permissions
 
     # Generate a signing key for license issuance
     keygen = LicenseKeygen()
