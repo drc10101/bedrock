@@ -54,3 +54,4 @@ logs/
 
 # Data directories (local dev only)
 data/*.db
+*.db

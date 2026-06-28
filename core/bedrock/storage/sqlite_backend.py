@@ -42,22 +42,37 @@ class SQLiteBackend:
         """Initialize SQLite backend.
 
         Args:
-            db_path: Path to the SQLite database file.
+            db_path: Path to the SQLite database file. Use ":memory:" for
+                in-memory databases (single shared connection, no WAL).
             wal_mode: If True, enable WAL mode for concurrent read access.
+                Ignored for in-memory databases.
         """
         self.db_path = db_path
-        self._wal_mode = wal_mode
+        self._in_memory = db_path == ":memory:"
+        self._wal_mode = wal_mode and not self._in_memory
+        self._shared_conn: sqlite3.Connection | None = None
         self._local = threading.local()
         self._lock = threading.Lock()
         self._initialized_tables: set[str] = set()
 
     def _get_conn(self) -> sqlite3.Connection:
-        """Get a thread-local database connection."""
+        """Get a database connection.
+
+        For in-memory databases, returns a single shared connection
+        (since :memory: DBs are connection-scoped). For file databases,
+        returns a per-thread connection with WAL mode.
+        """
+        if self._in_memory:
+            if self._shared_conn is None:
+                self._shared_conn = sqlite3.connect(self.db_path, check_same_thread=False)
+                self._shared_conn.execute("PRAGMA synchronous=NORMAL")
+                self._shared_conn.execute("PRAGMA foreign_keys=ON")
+                self._shared_conn.row_factory = sqlite3.Row
+            return self._shared_conn
+
         if not hasattr(self._local, "conn") or self._local.conn is None:
             conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            conn.execute(
-                "PRAGMA journal_mode=WAL" if self._wal_mode else "PRAGMA journal_mode=DELETE"
-            )
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.row_factory = sqlite3.Row

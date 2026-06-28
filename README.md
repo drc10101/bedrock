@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/drc10101/bedrock/releases/tag/v0.3.0"><img src="https://img.shields.io/badge/version-0.3.0-blue" alt="Version"></a>
-  <img src="https://img.shields.io/badge/tests-930-passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-841-passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-BSL--1.1-orange" alt="License">
   <img src="https://img.shields.io/badge/trial-free_30_days-success" alt="Free Trial">
@@ -27,6 +27,10 @@ Bedrock provides the foundational security layer for applications that handle se
 - **Consent-gated access.** No cross-silo data access without cryptographic proof of consent.
 - **Audit everything.** SHA-256 hash chain — tamper-evident, tamper-resistant.
 - **Self-hosted first.** No Bedrock-operated infrastructure required.
+
+## Status
+
+Bedrock v0.3 is an active development release. The core crypto, identity, data separation, and licensing modules are well-tested (841 tests passing, zero type errors). The HTTP API server has SQLite persistence and works for development and testing, but is not yet hardened for production traffic (uses stdlib HTTPServer, no request timeouts, no graceful shutdown). See [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for the roadmap.
 
 ## Quick Start
 

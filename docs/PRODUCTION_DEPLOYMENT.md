@@ -129,3 +129,16 @@ spec:
 - [ ] Stripe keys (if used) are stored in a secrets manager
 - [ ] `.env` files are in `.gitignore`
 - [ ] Production database uses encrypted storage (SQLite with SQLCipher or external DB)
+## Current Server Status (v0.3)
+
+The Bedrock HTTP API server uses Python stdlib `http.server.HTTPServer` with SQLite persistence. This is suitable for development, testing, and low-traffic internal deployments. It is **not yet hardened for public-facing production traffic**.
+
+Known limitations:
+- No request timeouts or connection pooling
+- No graceful shutdown (Ctrl+C only)
+- No rate-limit bypass for health endpoints
+- TLS termination is in-process (no reverse proxy integration documented)
+- SQLite is single-writer (concurrent writes serialize)
+- No automated database migration system
+
+For production deployment behind a reverse proxy (nginx/Caddy), the core crypto, identity, consent, and licensing modules are production-grade. The HTTP transport layer needs hardening or replacement (e.g., FastAPI + uvicorn) for high-traffic scenarios.

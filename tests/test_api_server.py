@@ -36,6 +36,7 @@ class TestAPIServer:
             config=self.config,
             api_keys=self.api_keys,
             tls_config=TLSConfig(enabled=False),  # No TLS for test client
+            db_path=":memory:",  # In-memory SQLite for tests
         )
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever)

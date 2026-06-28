@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Bedrock Legacy Decryption — InFill compatibility layer.
 
@@ -26,13 +28,13 @@ Migration path:
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-import base64
-import struct
-from typing import TYPE_CHECKING
+import base64  # noqa: E402
+import struct  # noqa: E402
+from typing import TYPE_CHECKING  # noqa: E402
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives import hashes  # noqa: E402
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: E402
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF  # noqa: E402
 
 if TYPE_CHECKING:
     from cryptography.fernet import Fernet
