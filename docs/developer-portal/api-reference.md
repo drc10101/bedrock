@@ -465,7 +465,7 @@ Add a mesh neighbor for routing.
 ```python
 client.transport.add_neighbor(
     node_id="node-beta",
-    endpoint="https://mesh.example.com:8443",
+    endpoint="https://bedrock.infill.systems",
 )
 ```
 

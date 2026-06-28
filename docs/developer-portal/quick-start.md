@@ -276,7 +276,7 @@ has_perm = client.access.check_permission(
 # Add a neighbor to the mesh
 client.transport.add_neighbor(
     node_id="node-abc",
-    endpoint="https://mesh.example.com:8443",
+    endpoint="https://bedrock.infill.systems",
 )
 
 # Flag a suspicious node

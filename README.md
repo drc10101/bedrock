@@ -100,7 +100,7 @@ docker compose -f deploy/docker-compose.yml up
 from bedrock_sdk import BedrockClient
 
 client = BedrockClient(
-    base_url="https://bedrock.example.com",
+    base_url="https://bedrock.infill.systems",
     license_key="1:...",
 )
 
@@ -139,7 +139,7 @@ consent = client.consent.request(
 import { BedrockClient } from "@infill/bedrock-sdk";
 
 const client = new BedrockClient({
-  baseUrl: "https://bedrock.example.com",
+  baseUrl: "https://bedrock.infill.systems",
   licenseKey: "1:...",
 });
 

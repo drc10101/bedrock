@@ -29,7 +29,7 @@ my-health-app/
 You need a license key to run Bedrock. A free 30-day trial gives you full developer features, 3 local nodes, and self-signed certificates.
 
 ```bash
-bedrock trial --licensee "you@example.com"
+bedrock trial --licensee "you@yourdomain.com"
 ```
 
 This writes your license key to `bedrock.env`. For production, you'd purchase a license at [bedrock.dev/pricing](https://bedrock.dev/pricing) and replace the trial key — no code changes needed.
