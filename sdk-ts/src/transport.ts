@@ -1,7 +1,7 @@
 /**
  * Transport SDK module — TLS config, E2EE messaging, mesh networking.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type {

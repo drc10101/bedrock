@@ -4,7 +4,7 @@
  * Provides a unified API wrapping all modules with developer-friendly
  * defaults, validation, and error handling.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type { BedrockConfig } from './types';

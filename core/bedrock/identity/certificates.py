@@ -9,7 +9,7 @@ Two-tier licensing:
 - Developer mode: self-signed certificates, localhost only, max 3 nodes
 - Runtime mode: CA-signed certificates, per-node enforcement, production
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import hashlib

@@ -11,7 +11,7 @@ This template provides:
 4. CMMC/DFARS compliance mapping report
 5. Configuration presets tuned for NIST 800-171 and CMMC Level 2/3
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

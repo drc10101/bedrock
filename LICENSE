@@ -1,28 +1,57 @@
-PROPRIETARY LICENSE
+Business Source License 1.1
 
-Copyright (c) 2024-2026 InFill Systems, LLC. All rights reserved.
+Copyright (c) 2025-2026 InFill Systems, LLC
 
-This software and associated documentation files (the "Software") are the
-confidential and proprietary information of InFill Systems, LLC. You shall
-not disclose such confidential information and shall use it only in accordance
-with the terms of the License Agreement you entered into with InFill Systems, LLC.
+License Scope: The contents of this repository are licensed under the
+Business Source License 1.1 (the "License"). You may not use this file
+except in compliance with the License. You may obtain a copy of the
+License at https://github.com/drc10101/bedrock/blob/main/LICENSE
 
-UNAUTHORIZED COPYING, DISTRIBUTION, OR USE OF THIS SOFTWARE, VIA ANY MEDIUM,
-IS STRICTLY PROHIBITED.
+Change Date: On or after the Change Date specified in the License
+Reference below, you may use this software under the terms of the
+Change License specified below.
 
-RESTRICTED RIGHTS NOTICE
+Change License: Apache License, Version 2.0
 
-This Software is provided under a license agreement containing restrictions
-on use, disclosure, and modification. Use, duplication, or disclosure by the
-U.S. Government is subject to restrictions set forth in the license agreement
-and applicable provisions of the Federal Acquisition Regulation and its
-supplements.
+License Reference: Bedrock Core — BSL 1.1
 
-TRADE SECRET
+Additional Use Grant: You may use the Software for development,
+testing, and evaluation purposes, including in non-production
+environments, provided that:
 
-This Software contains trade secrets of InFill Systems, LLC. No part of this
-Software may be reproduced, stored in a retrieval system, or transmitted in
-any form or by any means — electronic, mechanical, photocopying, recording,
-or otherwise — without the prior written permission of InFill Systems, LLC.
+  1. You have obtained a valid license key from InFill Systems, LLC;
+     OR
+  2. You are within a 30-day trial period, which begins on the date
+     you first install or use the Software.
 
-For licensing inquiries: licensing@infill.systems
+Production deployment of the Software requires a Production License
+from InFill Systems, LLC. "Production" means any deployment that
+serves end users, processes live data, or operates in a non-
+development environment.
+
+You may create modifications, extensions, or derivative works of the
+Software, provided that:
+
+  (a) Any derivative works are also subject to this License; and
+  (b) You retain all original copyright notices; and
+  (c) You do not represent that your derivative works are the
+      original Software.
+
+You may not:
+  - Use the Software in production without a valid Production License;
+  - Use the Software after the 30-day trial period without a valid
+    Developer or Production License;
+  - Remove, alter, or obscure any license enforcement mechanisms;
+  - Distribute the Software or derivative works under a different
+    license without written permission from InFill Systems, LLC;
+  - Use the Software to compete with InFill Systems, LLC.
+
+The Software is provided "as is", without warranty of any kind,
+express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose and noninfringement.
+In no event shall the authors or copyright holders be liable for any
+claim, damages or other liability, whether in an action of contract,
+tort or otherwise, arising from, out of or in connection with the
+Software or the use or other dealings in the Software.
+
+For license inquiries: licensing@infill.systems

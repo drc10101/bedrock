@@ -4,7 +4,7 @@
  * Developer tier: 3 local nodes, self-signed certs.
  * Production tier: CA-enforced per-node limits.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import { LicenseTier } from './types';

@@ -11,7 +11,7 @@ Security properties:
 - Consent can be revoked at any time
 - Consent is scoped to specific categories and operations
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import uuid

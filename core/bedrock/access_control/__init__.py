@@ -3,7 +3,7 @@ Bedrock Access Control.
 
 RBAC with role-portal mapping, scoped sessions, MFA, account lockout.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.access_control.controller import (

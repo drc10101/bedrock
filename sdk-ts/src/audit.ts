@@ -2,7 +2,7 @@
  * Audit SDK module — Write events, verify integrity, export for compliance.
  *
  * Uses SHA-256 hash chain for tamper-evident logging.
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type { AuditEntry } from './types';

@@ -14,7 +14,7 @@ The E2EE wrapping/unwrapping is delegated to the Encryption Engine's
 E2EEDeliverer class. Transport security ensures the channel is safe
 before data is exchanged.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import time

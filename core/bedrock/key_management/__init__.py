@@ -4,7 +4,7 @@ Bedrock Key Management.
 Master key hierarchy, HKDF derivation per silo, key rotation,
 and secure key storage.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.key_management.keys import KeyManager, MasterKey, SiloKey

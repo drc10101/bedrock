@@ -9,7 +9,7 @@ State transitions are logged to the audit chain.
 The mesh state machine is consensus-driven: ≥2 independent neighbor
 flags trigger quarantine. No single node can unilaterally isolate another.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from datetime import datetime, timezone, timedelta

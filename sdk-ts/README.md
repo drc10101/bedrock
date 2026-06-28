@@ -2,7 +2,7 @@
 
 Identity-based security framework for TypeScript/JavaScript. Every node is a user. Everything between is encrypted at rest.
 
-**Trade Secret — InFill Systems, LLC. All rights reserved.**
+**Licensed under BSL-1.1 — See [LICENSE](../LICENSE) for details.**
 
 ## Installation
 

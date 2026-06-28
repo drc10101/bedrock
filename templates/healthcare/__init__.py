@@ -10,7 +10,7 @@ This template provides:
 3. Role-portal mappings for healthcare
 4. Example configuration and usage
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

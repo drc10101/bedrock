@@ -1,7 +1,7 @@
 /**
  * Access SDK module — RBAC, sessions, MFA.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type { Session } from './types';

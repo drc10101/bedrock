@@ -1,7 +1,7 @@
 /**
  * Data SDK module — Silo configuration, consent-gated access, anonymous IDs.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import { ConsentStatus } from './types';

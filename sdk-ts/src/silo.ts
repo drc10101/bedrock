@@ -5,7 +5,7 @@
  * for a specific domain (identity, medical, financial, etc.) and
  * cross-silo access requires consent.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 /** Silo configuration. */

@@ -11,7 +11,7 @@ This template provides:
 4. SEC/FINRA compliance mapping report
 5. Configuration presets tuned for SEC Regulation S-P and FINRA rules
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

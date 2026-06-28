@@ -15,7 +15,7 @@ The genesis entry has prev_hash = "0" * 64 (64 zero hex chars).
 Verification: re-hash every entry and confirm the chain is unbroken.
 Tamper detection: any modified entry breaks all subsequent hashes.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import hashlib

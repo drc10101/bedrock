@@ -8,7 +8,7 @@ Two-tier model:
   - Developer License ($99/$499 annual): dev mode, 3 local nodes, self-signed certs
   - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import base64
@@ -26,15 +26,18 @@ from typing import Optional, Tuple
 class LicenseTier(Enum):
     """Licensing tiers controlling certificate authority and node limits.
 
+    TRIAL: Free 30-day evaluation. Full developer features, 3 nodes.
+        Automatically issued on first use. Converts to DEVELOPER after 30 days.
     DEVELOPER: Self-signed certificates, localhost only, max 3 nodes.
-        For development and testing. No CA required.
+        For development and testing. No CA required. $99/yr individual, $499/yr team.
     STARTER: CA-signed certificates, max 5 nodes.
-        For small production deployments.
+        For small production deployments. $5K/yr.
     BUSINESS: CA-signed certificates, max 25 nodes.
-        For mid-market deployments.
+        For mid-market deployments. $20K/yr.
     ENTERPRISE: CA-signed certificates, unlimited nodes.
-        For large-scale or air-gapped deployments.
+        For large-scale or air-gapped deployments. Custom pricing.
     """
+    TRIAL = "trial"
     DEVELOPER = "developer"
     STARTER = "starter"
     BUSINESS = "business"
@@ -43,6 +46,7 @@ class LicenseTier(Enum):
 
 # Node limits per license tier
 NODE_LIMITS = {
+    LicenseTier.TRIAL: 3,
     LicenseTier.DEVELOPER: 3,
     LicenseTier.STARTER: 5,
     LicenseTier.BUSINESS: 25,
@@ -51,6 +55,7 @@ NODE_LIMITS = {
 
 # Pricing per tier (annual USD)
 TIER_PRICING = {
+    LicenseTier.TRIAL: 0,  # Free 30-day trial
     LicenseTier.DEVELOPER: {"individual": 99, "team": 499},
     LicenseTier.STARTER: 5000,
     LicenseTier.BUSINESS: 20000,
@@ -69,6 +74,15 @@ STRIPE_PRICES = {
 
 # Feature flags per tier
 TIER_FEATURES = {
+    LicenseTier.TRIAL: [
+        "self_signed_certs",
+        "localhost_only",
+        "max_3_nodes",
+        "audit_export",
+        "basic_mesh",
+        "trial_mode",
+        "days_remaining_30",
+    ],
     LicenseTier.DEVELOPER: [
         "self_signed_certs",
         "localhost_only",
@@ -158,8 +172,13 @@ class License:
 
     @property
     def is_developer(self) -> bool:
-        """True if this is a developer license."""
-        return self.tier == LicenseTier.DEVELOPER
+        """True if this is a developer license (includes trial)."""
+        return self.tier in (LicenseTier.DEVELOPER, LicenseTier.TRIAL)
+
+    @property
+    def is_trial(self) -> bool:
+        """True if this is a trial license."""
+        return self.tier == LicenseTier.TRIAL
 
     @property
     def is_runtime(self) -> bool:
@@ -251,7 +270,7 @@ class LicenseEnforcer:
             tier = LicenseTier(tier)
         effective_max_nodes = max_nodes if max_nodes is not None else NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
         effective_features = features if features is not None else TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))
-        dev_mode = tier == LicenseTier.DEVELOPER
+        dev_mode = tier in (LicenseTier.DEVELOPER, LicenseTier.TRIAL)
 
         payload = {
             "key_id": "bedrock-2026-01",
@@ -277,6 +296,27 @@ class LicenseEnforcer:
         signature_b64 = base64.urlsafe_b64encode(signature.encode()).decode()
 
         return f"1:{payload_b64}:{signature_b64}"
+
+    def issue_trial_license(self, issued_to: str = "trial-user") -> str:
+        """Issue a free 30-day trial license.
+
+        Trial licenses grant full developer features for 30 days.
+        After expiration, users must purchase a Developer or Production license.
+
+        Args:
+            issued_to: Name or identifier for the trial user.
+
+        Returns:
+            Signed trial license key string.
+        """
+        trial_expires = time.time() + (30 * 86400)  # 30 days from now
+        return self.generate_license_key(
+            tier=LicenseTier.TRIAL,
+            issued_to=issued_to,
+            expires_at=trial_expires,
+        )
+
+    TRIAL_DURATION_DAYS = 30  # Class-level constant for external reference
 
     def validate_license(self, license_key: str) -> License:
         """Validate a license key offline. No phone-home.
@@ -406,17 +446,25 @@ class LicenseEnforcer:
         """Get developer mode restrictions.
 
         Developer mode: localhost only, self-signed certs, 3 nodes max.
+        Trial mode: same as developer, plus days_remaining and trial watermark.
         """
         if not license.is_developer:
             return {"dev_mode": False}
 
-        return {
+        result = {
             "dev_mode": True,
             "localhost_only": True,
             "self_signed_certs": True,
             "max_nodes": min(license.max_nodes, 3),
             "no_production": True,
         }
+
+        if license.is_trial:
+            days_left = license.days_until_expiry or 0
+            result["trial_mode"] = True
+            result["trial_days_remaining"] = max(0, int(days_left))
+
+        return result
 
     def get_tier_info(self, tier: LicenseTier) -> dict:
         """Get information about a license tier.
@@ -448,6 +496,7 @@ class LicenseEnforcer:
         Returns available upgrade tiers with pricing.
         """
         tier_order = [
+            LicenseTier.TRIAL,
             LicenseTier.DEVELOPER,
             LicenseTier.STARTER,
             LicenseTier.BUSINESS,

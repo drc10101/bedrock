@@ -4,7 +4,7 @@ Bedrock Data Separation Layer.
 Silo-based compartmentalization, anonymous ID generation,
 cross-silo identity mapping, and consent-gated data access.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.data_separation.silo import Silo, SiloManager

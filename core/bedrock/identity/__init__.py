@@ -4,7 +4,7 @@ Bedrock Identity Fabric.
 Node registration, attestation, certificate lifecycle, and capability scoping.
 Every node on the network is a cryptographic identity.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.identity.node import Node, NodeID, NodeState

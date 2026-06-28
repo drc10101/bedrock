@@ -4,7 +4,7 @@ Bedrock TLS — HTTPS/TLS termination for the API server.
 Provides TLS configuration, certificate generation, and server wrapping.
 Production uses CA-signed certs. Developer mode generates self-signed certs.
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import os

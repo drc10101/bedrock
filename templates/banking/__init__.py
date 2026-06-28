@@ -11,7 +11,7 @@ This template provides:
 4. PCI-DSS compliance mapping report
 5. Configuration presets tuned for PCI-DSS requirements
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

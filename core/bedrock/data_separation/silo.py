@@ -10,7 +10,7 @@ Each silo has:
 - Its own access controls (ConsentGate gates cross-silo access)
 - Categories for fine-grained compartmentalization within the silo
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

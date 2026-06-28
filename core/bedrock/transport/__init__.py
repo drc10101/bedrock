@@ -3,7 +3,7 @@ Bedrock Transport Security.
 
 TLS termination config, E2EE delivery, AAD-bound encryption, downgrade detection.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.transport.security import (

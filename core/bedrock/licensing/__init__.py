@@ -2,6 +2,7 @@
 Bedrock Licensing.
 
 Two-tier model:
+  - Trial (Free, 30 days): full developer features, 3 local nodes, self-signed certs
   - Developer License ($99/$499 annual): dev mode, 3 local nodes, self-signed certs
   - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
 

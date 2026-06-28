@@ -2,7 +2,7 @@
  * Encryption SDK module — Field-level encrypt/decrypt, E2EE delivery, key management.
  *
  * Uses Web Crypto API for browser and Node.js compatibility.
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type { KeyPair } from './types';

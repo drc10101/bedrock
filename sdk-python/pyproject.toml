@@ -7,7 +7,7 @@ name = "bedrock-sdk"
 version = "1.0.0"
 description = "Official Python SDK for Bedrock Core — identity-first encrypted application platform"
 requires-python = ">=3.11"
-license = {text = "Proprietary"}
+license = {text = "BSL-1.1"}
 authors = [{name = "InFill Systems, LLC"}]
 classifiers = [
     "Development Status :: 4 - Beta",

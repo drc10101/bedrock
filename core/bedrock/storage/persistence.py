@@ -5,7 +5,7 @@ Each module (NodeRegistry, CertificateManager, SiloManager, etc.) operates
 in-memory for speed. PersistentBedrock wraps these modules and syncs their
 state to a SQLite database on every mutation, and restores state on startup.
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import json

@@ -9,7 +9,7 @@ The router uses BFS for shortest-path and a modified BFS that excludes
 specific nodes for alternate paths. Capability scope filtering ensures
 data only flows through nodes authorized to see it.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from collections import deque

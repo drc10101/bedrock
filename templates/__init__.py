@@ -13,5 +13,5 @@ Available templates:
 - investment: SEC/FINRA-compliant portfolio data separation
 - defense: CMMC-compliant clearance-gated access
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """

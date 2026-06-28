@@ -4,7 +4,7 @@ Bedrock Encryption Engine.
 Generalizes InFill's ECDH+HKDF+GCM stack into a standalone module.
 Provides field-level encryption, E2EE delivery, and AAD construction.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.encryption.engine import (

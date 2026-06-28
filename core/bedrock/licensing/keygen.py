@@ -4,7 +4,7 @@ License key management — key generation, signing, rotation, and revocation.
 The keygen system produces master signing keys that license keys are signed with.
 Keys can be rotated (new master key, re-sign existing licenses) and revoked.
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import base64

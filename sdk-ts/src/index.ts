@@ -1,7 +1,7 @@
 /**
  * Bedrock TypeScript SDK — Module exports.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 export { BedrockClient } from './client';

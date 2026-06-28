@@ -15,7 +15,7 @@ Signal types:
 - AAD_MISMATCH: Decryption AAD doesn't match encryption AAD
 - SILENT_NODE: No heartbeat for T seconds
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field

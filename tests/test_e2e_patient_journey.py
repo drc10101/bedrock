@@ -15,7 +15,7 @@ Tests the complete lifecycle:
 11. RBAC with MFA (AccessController)
 12. Anonymous ID mapping (IDMappingTable)
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import time

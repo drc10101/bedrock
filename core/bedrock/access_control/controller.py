@@ -11,7 +11,7 @@ The access controller enforces:
 4. MFA verification — time-based one-time passwords (TOTP)
 5. Account lockout — progressive delays after failed auth attempts
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import hashlib

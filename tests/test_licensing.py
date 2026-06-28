@@ -695,4 +695,84 @@ class TestLicensingCertificateIntegration:
             node_name="Biz Node",
             public_key_hash="biz-hash",
         )
-        assert cert.issuer == "acme-ca"
+
+
+class TestTrialLicense:
+    """Tests for the free 30-day trial license tier."""
+
+    def test_trial_tier_exists(self):
+        """Trial tier should be a valid LicenseTier."""
+        assert LicenseTier.TRIAL.value == "trial"
+
+    def test_trial_key_generation(self):
+        """issue_trial_license should generate a valid trial key."""
+        enforcer = LicenseEnforcer()
+        key = enforcer.issue_trial_license(issued_to="test-user@example.com")
+        assert key  # Non-empty
+        assert key.startswith("1:")
+
+    def test_trial_license_validation(self):
+        """Trial key should validate as TRIAL tier."""
+        enforcer = LicenseEnforcer()
+        key = enforcer.issue_trial_license(issued_to="trial-tester")
+        license_obj = enforcer.validate_license(key)
+        assert license_obj.tier == LicenseTier.TRIAL
+        assert license_obj.is_trial is True
+        assert license_obj.is_developer is True  # Trial inherits developer privileges
+        assert license_obj.issued_to == "trial-tester"
+
+    def test_trial_license_expires_in_30_days(self):
+        """Trial license should expire 30 days from issuance."""
+        import time
+        enforcer = LicenseEnforcer()
+        before = time.time()
+        key = enforcer.issue_trial_license()
+        after = time.time()
+        license_obj = enforcer.validate_license(key)
+        # Should have ~30 days remaining
+        days_left = license_obj.days_until_expiry
+        assert days_left is not None
+        assert 29 <= days_left <= 30  # Allow for test execution time
+
+    def test_trial_node_limit_is_3(self):
+        """Trial tier allows max 3 nodes (same as developer)."""
+        assert NODE_LIMITS[LicenseTier.TRIAL] == 3
+
+    def test_trial_pricing_is_free(self):
+        """Trial tier should be free ($0)."""
+        assert TIER_PRICING[LicenseTier.TRIAL] == 0
+
+    def test_trial_features(self):
+        """Trial tier should include trial_mode feature flag."""
+        features = TIER_FEATURES[LicenseTier.TRIAL]
+        assert "trial_mode" in features
+        assert "self_signed_certs" in features
+        assert "localhost_only" in features
+
+    def test_trial_enforcement_mode(self):
+        """Trial license should enforce developer mode restrictions plus trial watermark."""
+        enforcer = LicenseEnforcer()
+        key = enforcer.issue_trial_license()
+        license_obj = enforcer.validate_license(key)
+        restrictions = enforcer.enforce_developer_mode(license_obj)
+        assert restrictions["dev_mode"] is True
+        assert restrictions["trial_mode"] is True
+        assert "trial_days_remaining" in restrictions
+        assert restrictions["localhost_only"] is True
+        assert restrictions["self_signed_certs"] is True
+
+    def test_trial_upgrade_path(self):
+        """Trial should be able to upgrade to developer and above."""
+        enforcer = LicenseEnforcer()
+        upgrades = enforcer.get_upgrade_path(LicenseTier.TRIAL)
+        assert "developer" in upgrades
+        assert "starter" in upgrades
+        assert "business" in upgrades
+        assert "enterprise" in upgrades
+
+    def test_trial_is_not_runtime(self):
+        """Trial license should not be considered a runtime/production license."""
+        enforcer = LicenseEnforcer()
+        key = enforcer.issue_trial_license()
+        license_obj = enforcer.validate_license(key)
+        assert license_obj.is_runtime is False

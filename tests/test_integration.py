@@ -12,7 +12,7 @@ work together:
 7. Access control + transport security
 8. Full patient data flow
 
-Trade Secret - InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import pytest

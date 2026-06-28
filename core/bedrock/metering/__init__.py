@@ -6,7 +6,7 @@ Tracks API calls per license key, per endpoint, per time period for:
 - Rate limiting (enforce per-tier limits)
 - Abuse detection (spike detection beyond normal usage)
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import time

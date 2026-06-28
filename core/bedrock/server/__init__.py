@@ -1,7 +1,7 @@
 """
 Bedrock Server — API server and TLS termination.
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.server.app import BedrockAPIHandler, APIError, create_server, run_server

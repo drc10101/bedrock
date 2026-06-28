@@ -2,7 +2,7 @@
  * Tests for the expanded Bedrock TypeScript SDK modules:
  * Licensing, Silos, Attestation, Consent lifecycle, Key derivation, Batch ops.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import {

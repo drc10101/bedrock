@@ -6,11 +6,10 @@ Provides:
   bedrock serve     — Start the API server
   bedrock keygen    — Generate signing keys
   bedrock license   — Issue and validate license keys
+  bedrock trial     — Generate a free 30-day trial license
   bedrock health    — Run health checks
   bedrock status    — Show system status and config summary
   bedrock version   — Show version info
-
-Trade Secret — InFill Systems, LLC. All rights reserved.
 """
 
 import argparse
@@ -215,6 +214,7 @@ def _license_issue(args):
 
     # Map tier string to LicenseTier enum
     tier_map = {
+        "trial": LicenseTier.TRIAL,
         "developer": LicenseTier.DEVELOPER,
         "starter": LicenseTier.STARTER,
         "business": LicenseTier.BUSINESS,
@@ -371,6 +371,28 @@ def cmd_status(args):
     return 0
 
 
+def cmd_trial(args):
+    """Generate a free 30-day trial license key."""
+    enforcer = LicenseEnforcer()
+    license_key = enforcer.issue_trial_license(issued_to=args.licensee)
+
+    # Validate it immediately to show details
+    license_obj = enforcer.validate_license(license_key)
+
+    print(f"Bedrock Trial License")
+    print(f"{'=' * 40}")
+    print(f"  License key: {license_key}")
+    print(f"  Tier:        {license_obj.tier.value}")
+    print(f"  Licensee:    {license_obj.issued_to}")
+    print(f"  Nodes:       {license_obj.max_nodes}")
+    print(f"  Expires:     30 days from now")
+    print(f"  Features:    {', '.join(license_obj.features)}")
+    print()
+    print(f"Save this key to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY.")
+    print(f"After 30 days, upgrade at https://bedrock.dev/pricing")
+    return 0
+
+
 def _load_keygen(args):
     """Load LicenseKeygen with existing keys or create new."""
     keys_path = Path(args.keys_file) if args.keys_file else Path("data/keys/signing_keys.json")
@@ -417,7 +439,7 @@ def build_parser():
     license_parser.add_argument("license_action", choices=["issue", "validate", "revoke", "info"],
                                 help="License action")
     license_parser.add_argument("--tier", default="developer",
-                                choices=["developer", "starter", "business", "enterprise"],
+                                choices=["trial", "developer", "starter", "business", "enterprise"],
                                 help="License tier")
     license_parser.add_argument("--licensee", default="unknown", help="Licensee name or ID")
     license_parser.add_argument("--nodes", type=int, default=3, help="Max nodes for license")
@@ -428,6 +450,12 @@ def build_parser():
     license_parser.add_argument("--reason", help="Reason for revocation")
     license_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
     license_parser.set_defaults(func=cmd_license)
+
+    # trial
+    trial_parser = subparsers.add_parser("trial", help="Generate a free 30-day trial license")
+    trial_parser.add_argument("--licensee", default="trial-user", help="Name or email for the trial")
+    trial_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
+    trial_parser.set_defaults(func=cmd_trial)
 
     # health
     health_parser = subparsers.add_parser("health", help="Run health checks")

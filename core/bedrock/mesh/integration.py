@@ -12,7 +12,7 @@ When a node is quarantined or revoked:
 This module provides the MeshIntegrator that coordinates these actions
 so that no isolated node can continue to access protected resources.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from datetime import datetime, timezone

@@ -1,7 +1,7 @@
 /**
  * Identity SDK module — Node registration, certificates, capability scoping, attestation.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import type {

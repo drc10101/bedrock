@@ -2,7 +2,7 @@
  * Tests for the Bedrock TypeScript SDK.
  *
  * Validates all modules: Identity, Encryption, Data, Audit, Access, Transport.
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import {

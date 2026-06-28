@@ -2,7 +2,7 @@
  * Bedrock SDK — Core types.
  *
  * All domain types shared across SDK modules.
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 // ---------------------------------------------------------------------------

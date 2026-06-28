@@ -15,7 +15,7 @@ Attestation flow:
 4. Pass → node transitions to ACTIVE (or stays ACTIVE)
 5. Fail → node transitions to QUARANTINED, audit chain records the failure
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import hashlib

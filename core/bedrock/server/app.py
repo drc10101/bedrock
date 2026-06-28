@@ -10,7 +10,7 @@ Security model:
 - No data leaves encrypted silos without consent verification
 - Audit trail logging on every mutation
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import json

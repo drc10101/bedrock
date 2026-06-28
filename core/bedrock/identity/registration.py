@@ -8,7 +8,7 @@ The NodeRegistry tracks all nodes, their states, and their capabilities.
 It enforces that every node has a unique cryptographic identity and
 valid state transitions.
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import uuid

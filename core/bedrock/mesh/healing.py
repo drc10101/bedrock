@@ -13,7 +13,7 @@ The healing lifecycle:
 5. HEAL: Node passes re-attestation, enters HEALING state
 6. RESTORE: After healing period with no new flags, node returns to ACTIVE
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from datetime import datetime, timezone, timedelta

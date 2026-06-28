@@ -13,7 +13,7 @@ Table structure:
   - bedrock_keys: encryption keys
   - bedrock_licenses: signing keys
 
-Trade Secret — InFill Systems, LLC. All rights reserved.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import json

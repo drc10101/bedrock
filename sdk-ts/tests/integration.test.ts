@@ -4,7 +4,7 @@
  * Tests that BedrockClient correctly wires all modules together
  * for realistic healthcare, banking, and multi-silo scenarios.
  *
- * Trade Secret — InFill Systems, LLC. All rights reserved.
+ * SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
  */
 
 import {

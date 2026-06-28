@@ -11,7 +11,7 @@ Quarantined nodes can heal through re-attestation.
 Integration: MeshIntegrator coordinates mesh state changes across
 Bedrock subsystems (certificates, audit, access control, consent).
 
-Trade Secret — InFill Systems, LLC.
+SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.mesh.detector import AttackDetector, DetectionSignal, SignalType
