@@ -8,7 +8,6 @@ sensitive configuration.
 
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 from bedrock.config import CoreConfig
 
@@ -16,6 +15,7 @@ from bedrock.config import CoreConfig
 @dataclass
 class HealthStatus:
     """Health check result for a single component."""
+
     name: str
     healthy: bool
     message: str = ""
@@ -25,12 +25,13 @@ class HealthStatus:
 @dataclass
 class HealthReport:
     """Aggregate health report for all Bedrock components."""
+
     status: str  # "healthy" | "degraded" | "unhealthy"
     environment: str
     tier: str
     timestamp: float
     uptime_seconds: float
-    components: Dict[str, HealthStatus]
+    components: dict[str, HealthStatus]
 
     def is_healthy(self) -> bool:
         """True if all components are healthy."""
@@ -58,15 +59,15 @@ class HealthReport:
 class HealthChecker:
     """Runs health checks on all Bedrock Core components."""
 
-    def __init__(self, config: Optional[CoreConfig] = None):
+    def __init__(self, config: CoreConfig | None = None):
         self._config = config or CoreConfig.from_env()
         self._start_time = time.time()
 
     def _check_encryption(self) -> HealthStatus:
         """Verify encryption module can derive keys and encrypt/decrypt."""
         try:
-            from bedrock.key_management.keys import KeyManager
             from bedrock.encryption.engine import FieldEncryptor
+            from bedrock.key_management.keys import KeyManager
 
             start = time.perf_counter()
             km = KeyManager()
@@ -141,7 +142,8 @@ class HealthChecker:
             start = time.perf_counter()
             enforcer = LicenseEnforcer()
             key = enforcer.generate_license_key(
-                tier=LicenseTier.DEVELOPER, issued_to="health-check",
+                tier=LicenseTier.DEVELOPER,
+                issued_to="health-check",
             )
             license_obj = enforcer.validate_license(key)
             latency = (time.perf_counter() - start) * 1000

@@ -21,40 +21,42 @@ Rotation policy:
 """
 
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 
 class RotationTrigger(Enum):
     """Why a key rotation was initiated."""
-    SCHEDULED = "scheduled"       # Automatic time-based rotation
-    MANUAL = "manual"             # Operator-initiated rotation
-    EMERGENCY = "emergency"       # Security incident
-    COMPLIANCE = "compliance"     # Regulatory requirement
+
+    SCHEDULED = "scheduled"  # Automatic time-based rotation
+    MANUAL = "manual"  # Operator-initiated rotation
+    EMERGENCY = "emergency"  # Security incident
+    COMPLIANCE = "compliance"  # Regulatory requirement
 
 
 class KeyState(Enum):
     """Lifecycle state of a master key."""
-    ACTIVE = "active"             # Current key, used for new encryption
-    GRACE = "grace"               # Old key, available for decryption only
-    RETIRED = "retired"           # No longer available, data must be re-encrypted
-    REVOKED = "revoked"           # Emergency revocation, key is destroyed
+
+    ACTIVE = "active"  # Current key, used for new encryption
+    GRACE = "grace"  # Old key, available for decryption only
+    RETIRED = "retired"  # No longer available, data must be re-encrypted
+    REVOKED = "revoked"  # Emergency revocation, key is destroyed
 
 
 @dataclass
 class MasterKeyRecord:
     """Metadata for a master key throughout its lifecycle."""
-    key_id: str                              # Unique identifier (hash of key material)
-    version: int                             # Monotonically increasing version number
-    state: KeyState                          # Current lifecycle state
-    created_at: datetime                     # When the key was created
-    activated_at: Optional[datetime] = None  # When it became the active key
-    retired_at: Optional[datetime] = None     # When it was retired
-    revoked_at: Optional[datetime] = None      # When it was revoked
-    trigger: Optional[RotationTrigger] = None  # What caused this key's creation
-    predecessor_id: Optional[str] = None       # Key this one replaced
+
+    key_id: str  # Unique identifier (hash of key material)
+    version: int  # Monotonically increasing version number
+    state: KeyState  # Current lifecycle state
+    created_at: datetime  # When the key was created
+    activated_at: datetime | None = None  # When it became the active key
+    retired_at: datetime | None = None  # When it was retired
+    revoked_at: datetime | None = None  # When it was revoked
+    trigger: RotationTrigger | None = None  # What caused this key's creation
+    predecessor_id: str | None = None  # Key this one replaced
 
 
 @dataclass
@@ -68,6 +70,7 @@ class RotationPolicy:
         max_grace_keys: Maximum number of grace-period keys retained simultaneously (default 3)
         auto_rotate: Whether to automatically rotate on schedule (default True)
     """
+
     rotation_interval_days: int = 90
     grace_period_days: int = 30
     emergency_grace_days: int = 7
@@ -103,14 +106,13 @@ class KeyRotationManager:
             rotator.rotate_master_key(trigger=RotationTrigger.SCHEDULED)
     """
 
-    def __init__(self, key_manager, master_key: bytes,
-                 policy: Optional[RotationPolicy] = None):
+    def __init__(self, key_manager, master_key: bytes, policy: RotationPolicy | None = None):
         self._key_manager = key_manager
         self._active_master_key = master_key
         self._policy = policy or RotationPolicy()
-        self._key_history: Dict[str, bytes] = {}  # key_id -> key material (grace period)
-        self._records: List[MasterKeyRecord] = []
-        self._rotation_log: List[dict] = []
+        self._key_history: dict[str, bytes] = {}  # key_id -> key material (grace period)
+        self._records: list[MasterKeyRecord] = []
+        self._rotation_log: list[dict] = []
 
         # Register the initial master key
         initial_id = self._key_id(master_key)
@@ -118,8 +120,8 @@ class KeyRotationManager:
             key_id=initial_id,
             version=1,
             state=KeyState.ACTIVE,
-            created_at=datetime.now(timezone.utc),
-            activated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            activated_at=datetime.now(UTC),
             trigger=RotationTrigger.MANUAL,
         )
         self._records.append(initial_record)
@@ -128,6 +130,7 @@ class KeyRotationManager:
     def _key_id(key: bytes) -> str:
         """Generate a unique ID for a master key (SHA-256 hash, hex)."""
         import hashlib
+
         return hashlib.sha256(key).hexdigest()[:16]
 
     @property
@@ -154,14 +157,14 @@ class KeyRotationManager:
         """Current rotation policy."""
         return self._policy
 
-    def get_grace_keys(self) -> List[Tuple[str, bytes]]:
+    def get_grace_keys(self) -> list[tuple[str, bytes]]:
         """Get all keys currently in grace period (available for decryption).
 
         Returns:
             List of (key_id, key_material) tuples for grace-period keys.
         """
         result = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for record in self._records:
             if record.state == KeyState.GRACE:
                 # Check if grace period has expired
@@ -187,7 +190,7 @@ class KeyRotationManager:
         if not self._policy.auto_rotate:
             return False
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         active_record = None
         for r in reversed(self._records):
             if r.state == KeyState.ACTIVE:
@@ -201,8 +204,9 @@ class KeyRotationManager:
         rotation_deadline = activated + timedelta(days=self._policy.rotation_interval_days)
         return now >= rotation_deadline
 
-    def rotate_master_key(self, trigger: RotationTrigger = RotationTrigger.MANUAL,
-                          new_key: Optional[bytes] = None) -> Tuple[bytes, MasterKeyRecord]:
+    def rotate_master_key(
+        self, trigger: RotationTrigger = RotationTrigger.MANUAL, new_key: bytes | None = None
+    ) -> tuple[bytes, MasterKeyRecord]:
         """Rotate the master key.
 
         Generates a new 256-bit master key (or uses the provided one),
@@ -218,7 +222,7 @@ class KeyRotationManager:
         if new_key is None:
             new_key = os.urandom(32)  # 256-bit
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         old_key_id = self._key_id(self._active_master_key)
         new_key_id = self._key_id(new_key)
 
@@ -257,14 +261,16 @@ class KeyRotationManager:
         # Note: _retired_keys are preserved for old-version silo key lookups
 
         # Log the rotation
-        self._rotation_log.append({
-            "timestamp": now.isoformat(),
-            "trigger": trigger.value,
-            "old_key_id": old_key_id,
-            "new_key_id": new_key_id,
-            "old_version": old_record.version if old_record else 0,
-            "new_version": new_version,
-        })
+        self._rotation_log.append(
+            {
+                "timestamp": now.isoformat(),
+                "trigger": trigger.value,
+                "old_key_id": old_key_id,
+                "new_key_id": new_key_id,
+                "old_version": old_record.version if old_record else 0,
+                "new_version": new_version,
+            }
+        )
 
         # Enforce max_grace_keys — retire oldest grace keys beyond limit
         self._enforce_grace_limit()
@@ -284,7 +290,7 @@ class KeyRotationManager:
         for r in self._records:
             if r.key_id == key_id and r.state == KeyState.GRACE:
                 r.state = KeyState.RETIRED
-                r.retired_at = datetime.now(timezone.utc)
+                r.retired_at = datetime.now(UTC)
                 break
         # Destroy key material
         self._key_history.pop(key_id, None)
@@ -302,7 +308,7 @@ class KeyRotationManager:
         for r in self._records:
             if r.key_id == key_id and r.state in (KeyState.ACTIVE, KeyState.GRACE):
                 r.state = KeyState.REVOKED
-                r.revoked_at = datetime.now(timezone.utc)
+                r.revoked_at = datetime.now(UTC)
                 break
         # Immediately destroy key material
         self._key_history.pop(key_id, None)
@@ -315,7 +321,7 @@ class KeyRotationManager:
                 "Call rotate_master_key() immediately to establish a new active key."
             )
 
-    def get_decrypt_key(self, silo_name: str, version: Optional[int] = None) -> bytes:
+    def get_decrypt_key(self, silo_name: str, version: int | None = None) -> bytes:
         """Get the appropriate key for decryption.
 
         If a specific version is requested, derives it from the active key.
@@ -335,12 +341,14 @@ class KeyRotationManager:
             # Check if we need a grace-period key
             # First try deriving from the active key
             try:
-                return self._key_manager.derive_silo_key(self._active_master_key, silo_name, version)
+                return self._key_manager.derive_silo_key(
+                    self._active_master_key, silo_name, version
+                )
             except Exception:
                 pass
 
             # Check grace keys
-            for key_id, key_material in self.get_grace_keys():
+            for _key_id, key_material in self.get_grace_keys():
                 try:
                     return self._key_manager.derive_silo_key(key_material, silo_name, version)
                 except Exception:
@@ -353,9 +361,15 @@ class KeyRotationManager:
 
         return self._key_manager.get_silo_key(self._active_master_key, silo_name)
 
-    def re_encrypt_field(self, field_encryptor, ciphertext: str,
-                         silo: str, record_id: str, scope: str,
-                         old_master_key: Optional[bytes] = None) -> str:
+    def re_encrypt_field(
+        self,
+        field_encryptor,
+        ciphertext: str,
+        silo: str,
+        record_id: str,
+        scope: str,
+        old_master_key: bytes | None = None,
+    ) -> str:
         """Re-encrypt a single field with the current active key.
 
         Args:
@@ -373,12 +387,14 @@ class KeyRotationManager:
         # If the old master key is provided, use it to create a decryptor
         if old_master_key is not None:
             from bedrock.encryption.engine import FieldEncryptor
+
             decrypt_fe = FieldEncryptor(self._key_manager, old_master_key)
         else:
             # Try grace keys to find one that decrypts
             from bedrock.encryption.engine import FieldEncryptor
+
             decrypt_fe = None
-            for key_id, key_material in self.get_grace_keys():
+            for _key_id, key_material in self.get_grace_keys():
                 candidate = FieldEncryptor(self._key_manager, key_material)
                 try:
                     plaintext = candidate.decrypt(ciphertext, silo, record_id, scope)
@@ -398,7 +414,7 @@ class KeyRotationManager:
 
         return new_ciphertext
 
-    def get_rotation_history(self) -> List[dict]:
+    def get_rotation_history(self) -> list[dict]:
         """Get the full rotation audit log.
 
         Returns:
@@ -406,7 +422,7 @@ class KeyRotationManager:
         """
         return list(self._rotation_log)
 
-    def get_key_records(self) -> List[MasterKeyRecord]:
+    def get_key_records(self) -> list[MasterKeyRecord]:
         """Get all key lifecycle records.
 
         Returns:
@@ -414,14 +430,14 @@ class KeyRotationManager:
         """
         return list(self._records)
 
-    def retire_expired_keys(self) -> List[str]:
+    def retire_expired_keys(self) -> list[str]:
         """Retire all grace-period keys whose grace period has expired.
 
         Returns:
             List of key IDs that were retired
         """
         retired_ids = []
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         for record in self._records:
             if record.state != KeyState.GRACE:

@@ -13,11 +13,11 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 
 class LicenseTier(Enum):
     """License tier for rate limiting and metering."""
+
     DEVELOPER = "developer"
     STARTER = "starter"
     BUSINESS = "business"
@@ -31,6 +31,7 @@ class TierLimits:
     Each tier has different allowances for requests per minute,
     burst size, and total monthly API calls.
     """
+
     requests_per_minute: int = 60
     requests_per_hour: int = 3600
     burst_size: int = 10
@@ -40,7 +41,7 @@ class TierLimits:
 
 
 # Pre-configured limits per tier
-TIER_LIMITS: Dict[str, TierLimits] = {
+TIER_LIMITS: dict[str, TierLimits] = {
     "developer": TierLimits(
         requests_per_minute=60,
         requests_per_hour=3600,
@@ -79,6 +80,7 @@ TIER_LIMITS: Dict[str, TierLimits] = {
 @dataclass
 class UsageRecord:
     """A single API usage record."""
+
     license_key: str
     endpoint: str
     method: str
@@ -91,14 +93,15 @@ class UsageRecord:
 @dataclass
 class UsageSummary:
     """Aggregated usage summary for a license key."""
+
     license_key: str
     tier: str
     period_start: float
     period_end: float
     total_requests: int = 0
-    requests_by_endpoint: Dict[str, int] = field(default_factory=dict)
-    requests_by_method: Dict[str, int] = field(default_factory=dict)
-    requests_by_status: Dict[int, int] = field(default_factory=dict)
+    requests_by_endpoint: dict[str, int] = field(default_factory=dict)
+    requests_by_method: dict[str, int] = field(default_factory=dict)
+    requests_by_status: dict[int, int] = field(default_factory=dict)
     total_bytes_sent: int = 0
     avg_response_time_ms: float = 0.0
     rate_limit_throttled: int = 0
@@ -114,30 +117,30 @@ class UsageMeter:
     - Per-endpoint breakdowns for usage reports
     """
 
-    def __init__(self, tier_limits: Optional[Dict[str, TierLimits]] = None):
+    def __init__(self, tier_limits: dict[str, TierLimits] | None = None):
         self.tier_limits = tier_limits or TIER_LIMITS
 
         # Rate limit windows (key -> [timestamps])
-        self._minute_windows: Dict[str, List[float]] = defaultdict(list)
-        self._hour_windows: Dict[str, List[float]] = defaultdict(list)
+        self._minute_windows: dict[str, list[float]] = defaultdict(list)
+        self._hour_windows: dict[str, list[float]] = defaultdict(list)
 
         # Violation tracking
-        self._violation_counts: Dict[str, int] = {}
-        self._blocked_until: Dict[str, float] = {}
+        self._violation_counts: dict[str, int] = {}
+        self._blocked_until: dict[str, float] = {}
 
         # Usage records for metering
-        self._usage_records: List[UsageRecord] = []
-        self._monthly_counts: Dict[str, int] = defaultdict(int)  # key -> count
-        self._monthly_reset: Dict[str, float] = {}  # key -> last_reset_timestamp
+        self._usage_records: list[UsageRecord] = []
+        self._monthly_counts: dict[str, int] = defaultdict(int)  # key -> count
+        self._monthly_reset: dict[str, float] = {}  # key -> last_reset_timestamp
 
         # Per-endpoint counters
-        self._endpoint_counts: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self._endpoint_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
 
         # Per-key throttled/blocked counters
-        self._throttled_counts: Dict[str, int] = defaultdict(int)
-        self._blocked_counts: Dict[str, int] = defaultdict(int)
+        self._throttled_counts: dict[str, int] = defaultdict(int)
+        self._blocked_counts: dict[str, int] = defaultdict(int)
 
-    def check_rate_limit(self, key: str, tier: str = "developer") -> Tuple[bool, Optional[str]]:
+    def check_rate_limit(self, key: str, tier: str = "developer") -> tuple[bool, str | None]:
         """Check if a request from key is within rate limits.
 
         Args:
@@ -192,9 +195,16 @@ class UsageMeter:
 
         return True, None
 
-    def record_usage(self, license_key: str, endpoint: str, method: str,
-                     status_code: int, response_time_ms: float = 0.0,
-                     bytes_sent: int = 0, tier: str = "developer") -> None:
+    def record_usage(
+        self,
+        license_key: str,
+        endpoint: str,
+        method: str,
+        status_code: int,
+        response_time_ms: float = 0.0,
+        bytes_sent: int = 0,
+        tier: str = "developer",
+    ) -> None:
         """Record an API usage event for billing and analytics.
 
         Args:
@@ -218,8 +228,9 @@ class UsageMeter:
         self._usage_records.append(record)
         self._endpoint_counts[license_key][endpoint] += 1
 
-    def get_usage_summary(self, license_key: str, tier: str = "developer",
-                          hours: float = 1.0) -> UsageSummary:
+    def get_usage_summary(
+        self, license_key: str, tier: str = "developer", hours: float = 1.0
+    ) -> UsageSummary:
         """Get usage summary for a license key over the last N hours.
 
         Args:
@@ -233,12 +244,13 @@ class UsageMeter:
         now = time.time()
         cutoff = now - (hours * 3600)
 
-        relevant = [r for r in self._usage_records
-                     if r.license_key == license_key and r.timestamp >= cutoff]
+        relevant = [
+            r for r in self._usage_records if r.license_key == license_key and r.timestamp >= cutoff
+        ]
 
-        by_endpoint: Dict[str, int] = defaultdict(int)
-        by_method: Dict[str, int] = defaultdict(int)
-        by_status: Dict[int, int] = defaultdict(int)
+        by_endpoint: dict[str, int] = defaultdict(int)
+        by_method: dict[str, int] = defaultdict(int)
+        by_status: dict[int, int] = defaultdict(int)
         total_bytes = 0
         total_response_time = 0.0
 
@@ -292,7 +304,9 @@ class UsageMeter:
             "blocked_until": blocked_until if is_blocked else None,
         }
 
-    def _handle_violation(self, key: str, now: float, limits: TierLimits) -> Tuple[bool, Optional[str]]:
+    def _handle_violation(
+        self, key: str, now: float, limits: TierLimits
+    ) -> tuple[bool, str | None]:
         """Handle a rate limit violation."""
         self._violation_counts[key] = self._violation_counts.get(key, 0) + 1
 
@@ -315,6 +329,4 @@ class UsageMeter:
                 ts for ts in self._minute_windows[key] if ts > minute_cutoff
             ]
         if key in self._hour_windows:
-            self._hour_windows[key] = [
-                ts for ts in self._hour_windows[key] if ts > hour_cutoff
-            ]
+            self._hour_windows[key] = [ts for ts in self._hour_windows[key] if ts > hour_cutoff]

@@ -17,41 +17,41 @@ Old keys are retained for decryption but new data uses the latest version.
 """
 
 import hashlib
-import hmac
 import os
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
+from datetime import UTC, datetime
 
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
 @dataclass
 class MasterKey:
     """Master key metadata. The actual key material is never stored in code."""
-    key_id: str               # Unique identifier
+
+    key_id: str  # Unique identifier
     created_at: datetime = None
     version: int = 1
-    source: str = "env"        # "env", "hsm", "file"
+    source: str = "env"  # "env", "hsm", "file"
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.now(timezone.utc)
+            self.created_at = datetime.now(UTC)
 
 
 @dataclass
 class SiloKey:
     """A derived key for a specific silo and version."""
-    silo_name: str             # e.g., "medical", "identity"
-    version: int               # Key version (incremented on rotation)
-    hkdf_info: str             # e.g., "bedrock:silo:medical:v1"
+
+    silo_name: str  # e.g., "medical", "identity"
+    version: int  # Key version (incremented on rotation)
+    hkdf_info: str  # e.g., "bedrock:silo:medical:v1"
     created_at: datetime = None
-    parent_key_id: str = ""    # Master key that derived this key
+    parent_key_id: str = ""  # Master key that derived this key
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.now(timezone.utc)
+            self.created_at = datetime.now(UTC)
 
 
 class KeyManager:
@@ -73,19 +73,18 @@ class KeyManager:
         # Cache of derived keys: (master_key_hash, silo_name, version) -> bytes
         # We hash the master key to use as part of the cache key so different
         # master keys never collide.
-        self._silo_key_cache: Dict[Tuple[bytes, str, int], bytes] = {}
+        self._silo_key_cache: dict[tuple[bytes, str, int], bytes] = {}
         # Track active versions: silo_name -> (master_key_hash, active_version)
-        self._active_versions: Dict[str, Tuple[bytes, int]] = {}
+        self._active_versions: dict[str, tuple[bytes, int]] = {}
         # Retired keys for decryption: (master_key_hash, silo_name, version) -> bytes
-        self._retired_keys: Dict[Tuple[bytes, str, int], bytes] = {}
+        self._retired_keys: dict[tuple[bytes, str, int], bytes] = {}
 
     @staticmethod
     def _key_id(master_key: bytes) -> bytes:
         """Hash the master key for use as a cache key identifier."""
         return hashlib.sha256(master_key).digest()
 
-    def derive_silo_key(self, master_key: bytes, silo_name: str,
-                        version: int = 1) -> bytes:
+    def derive_silo_key(self, master_key: bytes, silo_name: str, version: int = 1) -> bytes:
         """Derive a 256-bit key for a specific silo using HKDF-SHA256.
 
         The info string includes the silo name and version, ensuring:
@@ -106,7 +105,7 @@ class KeyManager:
         if cache_key in self._silo_key_cache:
             return self._silo_key_cache[cache_key]
 
-        info = f"bedrock:silo:{silo_name}:v{version}".encode("utf-8")
+        info = f"bedrock:silo:{silo_name}:v{version}".encode()
 
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -140,7 +139,7 @@ class KeyManager:
         Returns:
             256-bit derived key for this field type
         """
-        info = f"bedrock:field:{field_type}".encode("utf-8")
+        info = f"bedrock:field:{field_type}".encode()
 
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -150,8 +149,7 @@ class KeyManager:
         )
         return hkdf.derive(silo_key)
 
-    def rotate_silo_key(self, master_key: bytes, silo_name: str,
-                        current_version: int) -> SiloKey:
+    def rotate_silo_key(self, master_key: bytes, silo_name: str, current_version: int) -> SiloKey:
         """Rotate a silo key by incrementing the version number.
 
         Old keys are retained for decryption. New data uses the new key.
@@ -175,7 +173,7 @@ class KeyManager:
             self._retired_keys[(mk_id, silo_name, current_version)] = old_key
 
         # Derive the new key
-        new_key = self.derive_silo_key(master_key, silo_name, new_version)
+        self.derive_silo_key(master_key, silo_name, new_version)
         self._active_versions[silo_name] = (mk_id, new_version)
 
         return SiloKey(
@@ -193,8 +191,7 @@ class KeyManager:
         entry = self._active_versions.get(silo_name)
         return entry[1] if entry else 0
 
-    def get_silo_key(self, master_key: bytes, silo_name: str,
-                     version: Optional[int] = None) -> bytes:
+    def get_silo_key(self, master_key: bytes, silo_name: str, version: int | None = None) -> bytes:
         """Get a silo key, deriving it if necessary.
 
         Args:
@@ -211,8 +208,9 @@ class KeyManager:
                 version = 1  # Default to version 1
         return self.derive_silo_key(master_key, silo_name, version)
 
-    def get_retired_key(self, silo_name: str, version: int,
-                        master_key: Optional[bytes] = None) -> Optional[bytes]:
+    def get_retired_key(
+        self, silo_name: str, version: int, master_key: bytes | None = None
+    ) -> bytes | None:
         """Get a retired (old version) silo key for decryption.
 
         Returns None if the key is not in the retired cache.

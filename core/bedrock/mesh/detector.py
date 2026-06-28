@@ -19,13 +19,13 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 
 class SignalType(Enum):
     """Types of attack signals a node can detect."""
+
     CREDENTIAL_STUFFING = "credential_stuffing"
     LATERAL_MOVEMENT = "lateral_movement"
     UNUSUAL_VOLUME = "unusual_volume"
@@ -39,11 +39,12 @@ class SignalType(Enum):
 @dataclass
 class DetectionSignal:
     """A single detection event from a node's local detector."""
+
     signal_type: SignalType
-    source_node_id: str       # Node that detected the signal
-    target_node_id: str       # Node being flagged
+    source_node_id: str  # Node that detected the signal
+    target_node_id: str  # Node being flagged
     details: dict = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self):
         if self.details is None:
@@ -81,13 +82,14 @@ class AttackDetector:
         SignalType.SILENT_NODE: {"timeout_seconds": 300},
     }
 
-    def __init__(self, node_id: str, thresholds: Optional[Dict[SignalType, dict]] = None):
+    def __init__(self, node_id: str, thresholds: dict[SignalType, dict] | None = None):
         self.node_id = node_id
         self.thresholds = thresholds or dict(self.DEFAULT_THRESHOLDS)
-        self._signals: List[DetectionSignal] = []
+        self._signals: list[DetectionSignal] = []
 
-    def detect(self, signal_type: SignalType, target_node_id: str,
-               details: Optional[dict] = None) -> DetectionSignal:
+    def detect(
+        self, signal_type: SignalType, target_node_id: str, details: dict | None = None
+    ) -> DetectionSignal:
         """Record a detection signal against a node.
 
         Args:
@@ -107,7 +109,7 @@ class AttackDetector:
         self._signals.append(signal)
         return signal
 
-    def get_flags_for_node(self, node_id: str) -> List[DetectionSignal]:
+    def get_flags_for_node(self, node_id: str) -> list[DetectionSignal]:
         """Get all signals from this detector targeting a specific node."""
         return [s for s in self._signals if s.target_node_id == node_id]
 
@@ -122,17 +124,17 @@ class AttackDetector:
             node_id: The node to check
             consensus_threshold: Minimum number of independent flaggers required
         """
-        unique_flaggers: Set[str] = set()
+        unique_flaggers: set[str] = set()
         for s in self._signals:
             if s.target_node_id == node_id:
                 unique_flaggers.add(s.source_node_id)
         return len(unique_flaggers) >= consensus_threshold
 
-    def get_all_signals(self) -> List[DetectionSignal]:
+    def get_all_signals(self) -> list[DetectionSignal]:
         """Get all signals from this detector."""
         return list(self._signals)
 
-    def clear_signals(self, node_id: Optional[str] = None) -> int:
+    def clear_signals(self, node_id: str | None = None) -> int:
         """Clear signals, optionally filtered by target node.
 
         Returns:

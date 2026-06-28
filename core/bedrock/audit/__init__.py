@@ -7,6 +7,6 @@ Every action is appended to an immutable chain.
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-from bedrock.audit.chain import AuditChain, AuditEntry, AuditAction, GENESIS_HASH
+from bedrock.audit.chain import GENESIS_HASH, AuditAction, AuditChain, AuditEntry
 
 __all__ = ["AuditChain", "AuditEntry", "AuditAction", "GENESIS_HASH"]

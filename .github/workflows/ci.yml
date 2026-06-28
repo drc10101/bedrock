@@ -69,9 +69,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install linting tools
+      - name: Install project and linting tools
         run: |
           python -m pip install --upgrade pip
+          pip install -e ".[dev,stripe]"
           pip install ruff black isort mypy
 
       - name: Ruff check

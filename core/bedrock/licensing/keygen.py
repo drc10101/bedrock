@@ -12,14 +12,14 @@ import hashlib
 import json
 import os
 import time
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from pathlib import Path
 
 from bedrock.licensing.enforcement import (
-    LicenseEnforcer,
-    LicenseTier,
     NODE_LIMITS,
     TIER_FEATURES,
+    License,
+    LicenseTier,
 )
 
 
@@ -30,6 +30,7 @@ class SigningKey:
     Keys are identified by key_id and can be rotated or revoked.
     The key material is stored as bytes and never written to logs.
     """
+
     key_id: str
     key_material: bytes
     created_at: float = 0.0
@@ -103,7 +104,7 @@ class LicenseKeygen:
     def generate_signing_key(
         self,
         key_id: str = "",
-        key_material: Optional[bytes] = None,
+        key_material: bytes | None = None,
     ) -> SigningKey:
         """Generate a new signing key for license creation.
 
@@ -127,7 +128,7 @@ class LicenseKeygen:
         self._keys[key_id] = key
         return key
 
-    def get_key(self, key_id: str) -> Optional[SigningKey]:
+    def get_key(self, key_id: str) -> SigningKey | None:
         """Get a signing key by ID."""
         return self._keys.get(key_id)
 
@@ -163,7 +164,9 @@ class LicenseKeygen:
         key.revoke(reason)
         return True
 
-    def rotate_key(self, old_key_id: str, new_key_id: str = "") -> tuple[SigningKey, SigningKey] | None:
+    def rotate_key(
+        self, old_key_id: str, new_key_id: str = ""
+    ) -> tuple[SigningKey, SigningKey] | None:
         """Rotate a signing key — revoke old, generate new.
 
         The old key is revoked (not deleted, for audit trail).
@@ -201,10 +204,10 @@ class LicenseKeygen:
         key: SigningKey,
         tier: LicenseTier,
         issued_to: str = "",
-        max_nodes: Optional[int] = None,
+        max_nodes: int | None = None,
         max_devs: int = 5,
-        expires_days: Optional[int] = None,
-        features: Optional[list] = None,
+        expires_days: int | None = None,
+        features: list | None = None,
     ) -> str:
         """Issue a signed license key.
 
@@ -235,11 +238,17 @@ class LicenseKeygen:
         if isinstance(tier, str):
             tier = LicenseTier(tier)
 
-        effective_max_nodes = max_nodes if max_nodes is not None else NODE_LIMITS.get(
-            tier, NODE_LIMITS.get(tier.value, 3)
+        effective_max_nodes = (
+            max_nodes
+            if max_nodes is not None
+            else NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
         )
-        effective_features = features if features is not None else TIER_FEATURES.get(
-            tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+        effective_features = (
+            features
+            if features is not None
+            else TIER_FEATURES.get(
+                tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+            )
         )
         dev_mode = tier == LicenseTier.DEVELOPER
 
@@ -269,7 +278,7 @@ class LicenseKeygen:
 
         return f"1:{payload_b64}:{signature_b64}"
 
-    def validate_license(self, license_key: str) -> "License":
+    def validate_license(self, license_key: str) -> License:
         """Validate a license key against all active signing keys.
 
         Tries each active key until one validates the signature.
@@ -283,7 +292,11 @@ class LicenseKeygen:
         Raises:
             LicenseValidationError: If no active key validates the signature.
         """
-        from bedrock.licensing.enforcement import License, LicenseValidationError, LicenseExpiredError
+        from bedrock.licensing.enforcement import (
+            License,
+            LicenseExpiredError,
+            LicenseValidationError,
+        )
 
         if not license_key:
             raise LicenseValidationError("Empty license key")
@@ -333,7 +346,9 @@ class LicenseKeygen:
                 except (KeyError, ValueError) as e:
                     raise LicenseValidationError(f"Invalid tier in license: {e}")
 
-                max_nodes = payload.get("max_nodes", NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)))
+                max_nodes = payload.get(
+                    "max_nodes", NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
+                )
                 if max_nodes == 0:
                     max_nodes = float("inf")
 
@@ -346,7 +361,13 @@ class LicenseKeygen:
                     issued_to=payload.get("issued_to", ""),
                     issued_at=payload.get("issued_at", 0),
                     expires_at=payload.get("expires_at"),
-                    features=payload.get("features", TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))),
+                    features=payload.get(
+                        "features",
+                        TIER_FEATURES.get(
+                            tier,
+                            TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]),
+                        ),
+                    ),
                 )
 
                 if license_obj.is_expired:
@@ -372,7 +393,7 @@ class LicenseKeygen:
         if len(a) != len(b):
             return False
         result = 0
-        for x, y in zip(a, b):
+        for x, y in zip(a, b, strict=False):
             result |= ord(x) ^ ord(y)
         return result == 0
 
@@ -384,20 +405,19 @@ class LicenseKeygen:
         keys_data = [k.to_dict() for k in self._keys.values()]
         return json.dumps({"keys": keys_data, "exported_at": time.time()}, indent=2)
 
-    def export_keys_file(self, path: "Path") -> None:
+    def export_keys_file(self, path: Path) -> None:
         """Export signing keys to a file.
 
         Args:
             path: File path to write keys JSON.
         """
-        from pathlib import Path as _Path
-        path = _Path(path)
+        path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w") as f:
             f.write(self.export_keys())
 
     @classmethod
-    def from_file(cls, path: "Path") -> "LicenseKeygen":
+    def from_file(cls, path: Path) -> "LicenseKeygen":
         """Load a LicenseKeygen from a keys file.
 
         Args:
@@ -406,8 +426,7 @@ class LicenseKeygen:
         Returns:
             LicenseKeygen with loaded keys.
         """
-        from pathlib import Path as _Path
-        path = _Path(path)
+        path = Path(path)
         with open(path) as f:
             data = f.read()
         keygen = cls()
@@ -491,7 +510,7 @@ class LicenseKeygen:
         tier: LicenseTier,
         count: int,
         issued_to: str = "",
-        expires_days: Optional[int] = None,
+        expires_days: int | None = None,
         prefix: str = "",
     ) -> list[str]:
         """Issue multiple license keys at once.

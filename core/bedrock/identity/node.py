@@ -10,13 +10,12 @@ Every node in a Bedrock network has a cryptographic identity:
 B-105: Full implementation with ed25519 key generation.
 """
 
+import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Optional, List
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-import uuid
 
 
 class NodeState(Enum):
@@ -31,6 +30,7 @@ class NodeState(Enum):
     HEALING:       Re-attesting after quarantine. Can relay but not decrypt.
     REVOKED:       Permanently removed. Terminal state.
     """
+
     ACTIVE = "active"
     SUSPECT = "suspect"
     QUARANTINED = "quarantined"
@@ -47,12 +47,13 @@ class NodeID:
     signing attestation claims, E2EE key agreement, and certificate binding.
     The private key never leaves the node.
     """
+
     uuid: str  # UUID v7, time-sortable
     public_key: bytes  # ed25519 public key (32 bytes)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @classmethod
-    def generate(cls, private_key: Optional[Ed25519PrivateKey] = None) -> "NodeID":
+    def generate(cls, private_key: Ed25519PrivateKey | None = None) -> "NodeID":
         """Generate a new node ID with ed25519 key pair.
 
         Args:
@@ -66,7 +67,7 @@ class NodeID:
         public_key = private_key.public_key().public_bytes_raw()
 
         # UUID v7 if available (Python 3.13+), fallback to UUID v4
-        node_uuid = str(uuid.uuid7()) if hasattr(uuid, 'uuid7') else str(uuid.uuid4())
+        node_uuid = str(uuid.uuid7()) if hasattr(uuid, "uuid7") else str(uuid.uuid4())
 
         return cls(
             uuid=node_uuid,
@@ -90,17 +91,18 @@ class Node:
     Nodes have cryptographic identity, capability scope, and a trust state
     managed by the Self-Healing Mesh.
     """
+
     node_id: NodeID
     name: str
     node_type: str = "server"  # server, container, iot, gateway, client
-    capabilities: List = field(default_factory=list)  # CapabilityScope items
+    capabilities: list = field(default_factory=list)  # CapabilityScope items
     state: NodeState = NodeState.ACTIVE
-    attestation_baseline: Optional[str] = None  # SHA-256 hash of known-good state
-    certificate_serial: Optional[str] = None
-    certificate_expires: Optional[datetime] = None
-    last_heartbeat: Optional[datetime] = None
-    flags: List = field(default_factory=list)  # Neighbor flags for consensus
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    attestation_baseline: str | None = None  # SHA-256 hash of known-good state
+    certificate_serial: str | None = None
+    certificate_expires: datetime | None = None
+    last_heartbeat: datetime | None = None
+    flags: list = field(default_factory=list)  # Neighbor flags for consensus
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     metadata: dict = field(default_factory=dict)  # Extensible key-value pairs
 
     def can_route(self) -> bool:
@@ -133,11 +135,13 @@ class Node:
         When enough neighbors flag a node (consensus threshold), the
         Self-Healing Mesh transitions it to SUSPECT or QUARANTINED.
         """
-        self.flags.append({
-            "flagger": flagger_id,
-            "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
+        self.flags.append(
+            {
+                "flagger": flagger_id,
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        )
 
     def flag_count(self) -> int:
         """Number of unique neighbors that have flagged this node."""
@@ -145,7 +149,7 @@ class Node:
 
     def update_heartbeat(self) -> None:
         """Record a heartbeat from this node."""
-        self.last_heartbeat = datetime.now(timezone.utc)
+        self.last_heartbeat = datetime.now(UTC)
 
     def is_healthy(self, max_heartbeat_age_seconds: int = 300) -> bool:
         """Check if the node's heartbeat is recent enough.
@@ -156,5 +160,5 @@ class Node:
         """
         if self.last_heartbeat is None:
             return False
-        age = (datetime.now(timezone.utc) - self.last_heartbeat).total_seconds()
+        age = (datetime.now(UTC) - self.last_heartbeat).total_seconds()
         return age <= max_heartbeat_age_seconds

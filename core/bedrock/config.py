@@ -7,12 +7,12 @@ Environment-driven with sensible defaults.
 
 import os
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
 class EncryptionConfig:
     """Encryption Engine configuration."""
+
     # Master key source: env var name or file path
     master_key_source: str = "BEDROCK_MASTER_KEY"
 
@@ -23,7 +23,7 @@ class EncryptionConfig:
     # Field-level encryption
     field_cipher: str = "AES-256-GCM"
     field_key_length: int = 32  # 256 bits
-    field_iv_length: int = 12   # 96 bits (GCM nonce)
+    field_iv_length: int = 12  # 96 bits (GCM nonce)
     field_tag_length: int = 16  # 128 bits (GCM tag)
 
     # E2EE transport
@@ -32,7 +32,7 @@ class EncryptionConfig:
 
     # Database encryption
     db_cipher: str = "AES-256"  # SQLCipher
-    db_kdf_iter: int = 64000   # SQLCipher PBKDF2 iterations
+    db_kdf_iter: int = 64000  # SQLCipher PBKDF2 iterations
 
     # Version prefix for ciphertext format
     version_prefix: str = "v2:"
@@ -42,6 +42,7 @@ class EncryptionConfig:
 @dataclass
 class IdentityConfig:
     """Identity Fabric configuration."""
+
     # Node ID
     node_id_version: int = 7  # UUID v7
 
@@ -65,6 +66,7 @@ class IdentityConfig:
 @dataclass
 class DataSeparationConfig:
     """Data Separation Layer configuration."""
+
     # Anonymous IDs
     anon_id_format: str = "{adjective}-{animal}-{noun}"
     anon_id_word_lists: str = "default"  # or path to custom word list
@@ -76,13 +78,14 @@ class DataSeparationConfig:
 
     # Consent
     consent_default_ttl_seconds: int = 3600  # 1 hour
-    consent_max_ttl_seconds: int = 86400     # 24 hours max
+    consent_max_ttl_seconds: int = 86400  # 24 hours max
     consent_require_reason: bool = True
 
 
 @dataclass
 class AuditConfig:
     """Audit Chain configuration."""
+
     hash_algo: str = "SHA256"
     retention_years: int = 6
     chain_storage_path: str = "/var/lib/bedrock/audit"
@@ -93,6 +96,7 @@ class AuditConfig:
 @dataclass
 class AccessControlConfig:
     """Access Control configuration."""
+
     # RBAC
     rbac_enforce: bool = True
     rbac_default_role: str = "denied"  # Explicit deny by default
@@ -121,8 +125,9 @@ class AccessControlConfig:
 @dataclass
 class MeshConfig:
     """Self-Healing Mesh configuration."""
+
     # Detection thresholds
-    credential_stuffing_threshold: int = 50   # failed auth attempts
+    credential_stuffing_threshold: int = 50  # failed auth attempts
     credential_stuffing_window_seconds: int = 60
     unusual_volume_stddev: float = 3.0  # standard deviations from baseline
     heartbeat_timeout_seconds: int = 30
@@ -142,6 +147,7 @@ class MeshConfig:
 @dataclass
 class LicensingConfig:
     """Licensing configuration."""
+
     # License tiers
     tier: str = "developer"  # developer, starter, business, enterprise
 
@@ -164,6 +170,7 @@ class LicensingConfig:
 @dataclass
 class CoreConfig:
     """Top-level Bedrock Core configuration."""
+
     environment: str = "development"  # development, staging, production
     debug: bool = False
     log_level: str = "INFO"

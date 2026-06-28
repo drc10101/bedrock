@@ -12,12 +12,10 @@ Two-tier licensing:
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-import hashlib
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
 
 class LicenseTier(Enum):
@@ -32,6 +30,7 @@ class LicenseTier(Enum):
     ENTERPRISE: CA-signed certificates, unlimited nodes.
         For large-scale or air-gapped deployments.
     """
+
     DEVELOPER = "developer"
     STARTER = "starter"
     BUSINESS = "business"
@@ -40,6 +39,7 @@ class LicenseTier(Enum):
 
 class CertificateStatus(Enum):
     """Certificate lifecycle states."""
+
     ACTIVE = "active"
     EXPIRED = "expired"
     REVOKED = "revoked"
@@ -72,20 +72,21 @@ class Certificate:
     - It can be revoked immediately when a node is quarantined
     - Its serial number is unique and traceable in the audit chain
     """
+
     serial: str  # Unique certificate serial number
     node_uuid: str  # The node this cert belongs to
     node_name: str  # Human-readable node name
     public_key_hash: str  # SHA-256 of the node's ed25519 public key
-    capabilities: List[str]  # Data categories this node can access
-    issued_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = None  # Set during issuance
+    capabilities: list[str]  # Data categories this node can access
+    issued_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None  # Set during issuance
     status: CertificateStatus = CertificateStatus.ACTIVE
     issuer: str = "bedrock-ca"  # CA name or "bedrock-self-signed"
     license_tier: LicenseTier = LicenseTier.DEVELOPER
-    revoked_at: Optional[datetime] = None
+    revoked_at: datetime | None = None
     revocation_reason: str = ""
 
-    def is_valid(self, at: Optional[datetime] = None) -> bool:
+    def is_valid(self, at: datetime | None = None) -> bool:
         """Check if the certificate is currently valid.
 
         A certificate is valid if:
@@ -93,20 +94,18 @@ class Certificate:
         - Current time is between issued_at and expires_at
         - Not revoked
         """
-        check_time = at or datetime.now(timezone.utc)
+        check_time = at or datetime.now(UTC)
         if self.status != CertificateStatus.ACTIVE:
             return False
         if self.expires_at and check_time > self.expires_at:
             return False
-        if check_time < self.issued_at:
-            return False
-        return True
+        return not check_time < self.issued_at
 
-    def days_until_expiry(self) -> Optional[float]:
+    def days_until_expiry(self) -> float | None:
         """Days until this certificate expires. None if no expiry set."""
         if self.expires_at is None:
             return None
-        delta = self.expires_at - datetime.now(timezone.utc)
+        delta = self.expires_at - datetime.now(UTC)
         return delta.total_seconds() / 86400
 
     def needs_renewal(self, renewal_window_hours: int = 4) -> bool:
@@ -116,7 +115,7 @@ class Certificate:
         """
         if self.expires_at is None:
             return False
-        remaining = self.expires_at - datetime.now(timezone.utc)
+        remaining = self.expires_at - datetime.now(UTC)
         return remaining <= timedelta(hours=renewal_window_hours)
 
 
@@ -134,22 +133,29 @@ class CertificateManager:
     4. CRL: Certificate Revocation List for checking revoked certs
     """
 
-    def __init__(self, license_tier: LicenseTier = LicenseTier.DEVELOPER,
-                 default_ttl_hours: int = 24,
-                 renewal_window_hours: int = 4,
-                 ca_name: str = "bedrock-ca"):
+    def __init__(
+        self,
+        license_tier: LicenseTier = LicenseTier.DEVELOPER,
+        default_ttl_hours: int = 24,
+        renewal_window_hours: int = 4,
+        ca_name: str = "bedrock-ca",
+    ):
         self.license_tier = license_tier
         self.default_ttl_hours = default_ttl_hours
         self.renewal_window_hours = renewal_window_hours
         self.ca_name = ca_name if license_tier != LicenseTier.DEVELOPER else "bedrock-self-signed"
-        self._certificates: Dict[str, Certificate] = {}  # serial -> Certificate
-        self._node_certs: Dict[str, str] = {}  # node_uuid -> latest serial
-        self._crl: Set[str] = set()  # Set of revoked serial numbers
+        self._certificates: dict[str, Certificate] = {}  # serial -> Certificate
+        self._node_certs: dict[str, str] = {}  # node_uuid -> latest serial
+        self._crl: set[str] = set()  # Set of revoked serial numbers
 
-    def issue_certificate(self, node_uuid: str, node_name: str,
-                          public_key_hash: str,
-                          capabilities: Optional[List[str]] = None,
-                          ttl_hours: Optional[int] = None) -> Certificate:
+    def issue_certificate(
+        self,
+        node_uuid: str,
+        node_name: str,
+        public_key_hash: str,
+        capabilities: list[str] | None = None,
+        ttl_hours: int | None = None,
+    ) -> Certificate:
         """Issue a new certificate for a node.
 
         Enforces licensing: will not issue beyond the licensed node count.
@@ -171,7 +177,9 @@ class CertificateManager:
         # Enforce license limit
         if not self.check_license_limit():
             active_count = self._count_active_certs()
-            limit = NODE_LIMITS.get(self.license_tier) or NODE_LIMITS.get(self.license_tier.value, 3)
+            limit = NODE_LIMITS.get(self.license_tier) or NODE_LIMITS.get(
+                self.license_tier.value, 3
+            )
             raise LicenseExceededError(
                 f"License limit reached: {active_count} active certificates, "
                 f"limit is {limit} for {self.license_tier.value} tier. "
@@ -180,7 +188,7 @@ class CertificateManager:
 
         ttl = ttl_hours or self.default_ttl_hours
         serial = self._generate_serial()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expires_at = now + timedelta(hours=ttl)
 
         # Determine issuer based on license tier
@@ -205,8 +213,7 @@ class CertificateManager:
         self._node_certs[node_uuid] = serial
         return cert
 
-    def renew_certificate(self, node_uuid: str,
-                          ttl_hours: Optional[int] = None) -> Certificate:
+    def renew_certificate(self, node_uuid: str, ttl_hours: int | None = None) -> Certificate:
         """Auto-renew a certificate before expiry.
 
         Creates a new certificate with a new serial number and the same
@@ -277,7 +284,7 @@ class CertificateManager:
             raise KeyError(f"Certificate '{serial}' not found")
 
         cert.status = CertificateStatus.REVOKED
-        cert.revoked_at = datetime.now(timezone.utc)
+        cert.revoked_at = datetime.now(UTC)
         cert.revocation_reason = reason
 
         # Add to CRL
@@ -296,11 +303,11 @@ class CertificateManager:
         """
         return serial in self._crl
 
-    def get_certificate(self, serial: str) -> Optional[Certificate]:
+    def get_certificate(self, serial: str) -> Certificate | None:
         """Look up a certificate by serial number."""
         return self._certificates.get(serial)
 
-    def get_node_certificate(self, node_uuid: str) -> Optional[Certificate]:
+    def get_node_certificate(self, node_uuid: str) -> Certificate | None:
         """Look up a node's current certificate by node UUID."""
         serial = self._node_certs.get(node_uuid)
         if serial is None:
@@ -316,11 +323,11 @@ class CertificateManager:
         limit = NODE_LIMITS.get(self.license_tier) or NODE_LIMITS.get(self.license_tier.value, 3)
         return active_count < limit
 
-    def get_crl(self) -> Set[str]:
+    def get_crl(self) -> set[str]:
         """Get the full Certificate Revocation List (set of revoked serials)."""
         return set(self._crl)
 
-    def list_certificates(self, status: Optional[CertificateStatus] = None) -> List[Certificate]:
+    def list_certificates(self, status: CertificateStatus | None = None) -> list[Certificate]:
         """List certificates, optionally filtered by status."""
         certs = list(self._certificates.values())
         if status is not None:
@@ -330,7 +337,8 @@ class CertificateManager:
     def _count_active_certs(self) -> int:
         """Count certificates in ACTIVE or PENDING_RENEWAL status."""
         return sum(
-            1 for c in self._certificates.values()
+            1
+            for c in self._certificates.values()
             if c.status in (CertificateStatus.ACTIVE, CertificateStatus.PENDING_RENEWAL)
         )
 
@@ -344,4 +352,5 @@ class CertificateManager:
 
 class LicenseExceededError(Exception):
     """Raised when the license node limit is reached."""
+
     pass

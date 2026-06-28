@@ -10,8 +10,7 @@ Wire format uses base64url encoding to avoid delimiter collisions with timestamp
 import base64
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -21,21 +20,25 @@ class AAD:
     Serialized as base64url-encoded JSON to avoid delimiter collisions.
     If any field doesn't match at decryption time, the operation fails.
     """
-    operation: str    # e.g., "field", "e2ee", "audit"
-    silo: str         # e.g., "medical", "identity", "transaction"
-    record_id: str    # anonymous ID or record UUID
-    scope: str        # e.g., "read", "write", "consent"
-    timestamp: str    # ISO 8601 UTC
+
+    operation: str  # e.g., "field", "e2ee", "audit"
+    silo: str  # e.g., "medical", "identity", "transaction"
+    record_id: str  # anonymous ID or record UUID
+    scope: str  # e.g., "read", "write", "consent"
+    timestamp: str  # ISO 8601 UTC
 
     def to_string(self) -> str:
         """Serialize AAD to base64url-encoded JSON."""
-        payload = json.dumps({
-            "op": self.operation,
-            "si": self.silo,
-            "rid": self.record_id,
-            "sc": self.scope,
-            "ts": self.timestamp,
-        }, separators=(",", ":"))
+        payload = json.dumps(
+            {
+                "op": self.operation,
+                "si": self.silo,
+                "rid": self.record_id,
+                "sc": self.scope,
+                "ts": self.timestamp,
+            },
+            separators=(",", ":"),
+        )
         return "bedrock:" + base64.urlsafe_b64encode(payload.encode()).decode().rstrip("=")
 
     @classmethod
@@ -43,7 +46,7 @@ class AAD:
         """Parse AAD from base64url-encoded JSON. Raises ValueError on malformed input."""
         if not aad_string.startswith("bedrock:"):
             raise ValueError(f"Invalid AAD format: {aad_string}")
-        encoded = aad_string[len("bedrock:"):]
+        encoded = aad_string[len("bedrock:") :]
         # Restore padding
         padding = 4 - len(encoded) % 4
         if padding != 4:
@@ -66,10 +69,11 @@ class AAD:
         )
 
 
-def build_aad(operation: str, silo: str, record_id: str,
-              scope: str, timestamp: Optional[str] = None) -> AAD:
+def build_aad(
+    operation: str, silo: str, record_id: str, scope: str, timestamp: str | None = None
+) -> AAD:
     """Convenience function to build AAD with current UTC timestamp."""
-    ts = timestamp or datetime.now(timezone.utc).isoformat()
+    ts = timestamp or datetime.now(UTC).isoformat()
     return AAD(
         operation=operation,
         silo=silo,

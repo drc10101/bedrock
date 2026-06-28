@@ -15,15 +15,20 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from bedrock.mesh.detector import AttackDetector, DetectionSignal, SignalType
-from bedrock.mesh.state_machine import MeshStateMachine, TransitionRecord
+from bedrock.mesh.healing import HealingResult, SelfHealingMesh
+from bedrock.mesh.integration import MeshEvent, MeshIntegrator
 from bedrock.mesh.router import MeshRouter
-from bedrock.mesh.healing import SelfHealingMesh, HealingResult
-from bedrock.mesh.integration import MeshIntegrator, MeshEvent
+from bedrock.mesh.state_machine import MeshStateMachine, TransitionRecord
 
 __all__ = [
-    "AttackDetector", "DetectionSignal", "SignalType",
-    "MeshStateMachine", "TransitionRecord",
+    "AttackDetector",
+    "DetectionSignal",
+    "SignalType",
+    "MeshStateMachine",
+    "TransitionRecord",
     "MeshRouter",
-    "SelfHealingMesh", "HealingResult",
-    "MeshIntegrator", "MeshEvent",
+    "SelfHealingMesh",
+    "HealingResult",
+    "MeshIntegrator",
+    "MeshEvent",
 ]

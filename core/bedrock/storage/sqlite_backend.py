@@ -17,11 +17,9 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import json
-import os
 import sqlite3
 import threading
 import time
-from typing import Any, Optional
 
 
 class SQLiteBackend:
@@ -55,7 +53,9 @@ class SQLiteBackend:
         """Get a thread-local database connection."""
         if not hasattr(self._local, "conn") or self._local.conn is None:
             conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            conn.execute("PRAGMA journal_mode=WAL" if self._wal_mode else "PRAGMA journal_mode=DELETE")
+            conn.execute(
+                "PRAGMA journal_mode=WAL" if self._wal_mode else "PRAGMA journal_mode=DELETE"
+            )
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.row_factory = sqlite3.Row
@@ -98,7 +98,7 @@ class SQLiteBackend:
         )
         conn.commit()
 
-    def load(self, table: str, key: str) -> Optional[dict]:
+    def load(self, table: str, key: str) -> dict | None:
         """Load a record by key.
 
         Args:
@@ -110,9 +110,7 @@ class SQLiteBackend:
         """
         self._ensure_table(table)
         conn = self._get_conn()
-        row = conn.execute(
-            f"SELECT data FROM {table} WHERE key = ?", (key,)
-        ).fetchone()
+        row = conn.execute(f"SELECT data FROM {table} WHERE key = ?", (key,)).fetchone()
         if row is None:
             return None
         return json.loads(row["data"])
@@ -136,9 +134,7 @@ class SQLiteBackend:
         """
         self._ensure_table(table)
         conn = self._get_conn()
-        cursor = conn.execute(
-            f"DELETE FROM {table} WHERE key = ?", (key,)
-        )
+        cursor = conn.execute(f"DELETE FROM {table} WHERE key = ?", (key,))
         conn.commit()
         return cursor.rowcount > 0
 
@@ -153,9 +149,7 @@ class SQLiteBackend:
         """Check if a record exists."""
         self._ensure_table(table)
         conn = self._get_conn()
-        row = conn.execute(
-            f"SELECT 1 FROM {table} WHERE key = ?", (key,)
-        ).fetchone()
+        row = conn.execute(f"SELECT 1 FROM {table} WHERE key = ?", (key,)).fetchone()
         return row is not None
 
     def query(self, table: str, filter_fn=None) -> dict[str, dict]:

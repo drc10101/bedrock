@@ -16,11 +16,9 @@ import hashlib
 import hmac
 import json
 import os
-import struct
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Tuple
 
 
 class LicenseTier(Enum):
@@ -37,6 +35,7 @@ class LicenseTier(Enum):
     ENTERPRISE: CA-signed certificates, unlimited nodes.
         For large-scale or air-gapped deployments. Custom pricing.
     """
+
     TRIAL = "trial"
     DEVELOPER = "developer"
     STARTER = "starter"
@@ -162,14 +161,15 @@ class License:
         HMAC-SHA256(payload, signing_key) — the signing key is embedded
         in the library and not extractable from compiled code.
     """
-    license_key: str            # Full license key string
-    tier: LicenseTier           # License tier
-    max_nodes: int              # Maximum number of nodes (0 = unlimited)
-    max_devs: int               # Maximum developers (developer tier only)
-    dev_mode: bool              # True = localhost only, self-signed certs
-    issued_to: str = ""         # Company or developer name
-    issued_at: float = 0.0      # Unix timestamp of issuance
-    expires_at: Optional[float] = None  # Unix timestamp of expiration
+
+    license_key: str  # Full license key string
+    tier: LicenseTier  # License tier
+    max_nodes: int  # Maximum number of nodes (0 = unlimited)
+    max_devs: int  # Maximum developers (developer tier only)
+    dev_mode: bool  # True = localhost only, self-signed certs
+    issued_to: str = ""  # Company or developer name
+    issued_at: float = 0.0  # Unix timestamp of issuance
+    expires_at: float | None = None  # Unix timestamp of expiration
     features: list = field(default_factory=list)
 
     @property
@@ -195,7 +195,7 @@ class License:
         return time.time() > self.expires_at
 
     @property
-    def days_until_expiry(self) -> Optional[float]:
+    def days_until_expiry(self) -> float | None:
         """Days until this license expires. None if no expiry."""
         if self.expires_at is None:
             return None
@@ -213,16 +213,19 @@ class License:
 
 class LicenseValidationError(Exception):
     """Raised when a license key fails validation."""
+
     pass
 
 
 class LicenseExpiredError(LicenseValidationError):
     """Raised when a license has expired."""
+
     pass
 
 
 class LicenseLimitError(Exception):
     """Raised when the license node limit has been reached."""
+
     pass
 
 
@@ -243,6 +246,7 @@ def _get_signing_key() -> bytes:
         _LICENSE_SIGNING_KEY = env_key.encode("utf-8")
     else:
         import hashlib
+
         # Development-only key derived from machine info.
         # NOT suitable for production license signing.
         dev_seed = f"bedrock-dev-{os.environ.get('USER', 'anonymous')}-{os.environ.get('HOSTNAME', 'localhost')}"
@@ -264,11 +268,15 @@ class LicenseEnforcer:
     def __init__(self, signing_key: bytes | None = None):
         self.signing_key = signing_key or _get_signing_key()
 
-    def generate_license_key(self, tier: LicenseTier, issued_to: str = "",
-                              max_nodes: Optional[int] = None,
-                              max_devs: int = 5,
-                              expires_at: Optional[float] = None,
-                              features: Optional[list] = None) -> str:
+    def generate_license_key(
+        self,
+        tier: LicenseTier,
+        issued_to: str = "",
+        max_nodes: int | None = None,
+        max_devs: int = 5,
+        expires_at: float | None = None,
+        features: list | None = None,
+    ) -> str:
         """Generate a license key for a given tier.
 
         This method is used by the Bedrock license server to issue keys.
@@ -288,8 +296,18 @@ class LicenseEnforcer:
         # Resolve tier to enum for consistent dict lookups (handles both enum and string inputs)
         if isinstance(tier, str):
             tier = LicenseTier(tier)
-        effective_max_nodes = max_nodes if max_nodes is not None else NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
-        effective_features = features if features is not None else TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))
+        effective_max_nodes = (
+            max_nodes
+            if max_nodes is not None
+            else NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3))
+        )
+        effective_features = (
+            features
+            if features is not None
+            else TIER_FEATURES.get(
+                tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+            )
+        )
         dev_mode = tier in (LicenseTier.DEVELOPER, LicenseTier.TRIAL)
 
         payload = {
@@ -366,9 +384,7 @@ class LicenseEnforcer:
 
         version, payload_b64, signature_b64 = parts
         if version != "1":
-            raise LicenseValidationError(
-                f"Unsupported license key version: {version}"
-            )
+            raise LicenseValidationError(f"Unsupported license key version: {version}")
 
         # Decode payload
         try:
@@ -415,7 +431,12 @@ class LicenseEnforcer:
             issued_to=payload.get("issued_to", ""),
             issued_at=payload.get("issued_at", 0),
             expires_at=payload.get("expires_at"),
-            features=payload.get("features", TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER]))),
+            features=payload.get(
+                "features",
+                TIER_FEATURES.get(
+                    tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+                ),
+            ),
         )
 
         # Check expiration
@@ -426,7 +447,7 @@ class LicenseEnforcer:
 
         return license_obj
 
-    def validate_license_from_file(self, path: Optional[str] = None) -> License:
+    def validate_license_from_file(self, path: str | None = None) -> License:
         """Validate a license key from a file.
 
         Args:
@@ -443,13 +464,12 @@ class LicenseEnforcer:
         if not os.path.exists(license_path):
             raise FileNotFoundError(f"License file not found: {license_path}")
 
-        with open(license_path, "r") as f:
+        with open(license_path) as f:
             license_key = f.read().strip()
 
         return self.validate_license(license_key)
 
-    def can_issue_certificate(self, license: License,
-                              current_node_count: int) -> bool:
+    def can_issue_certificate(self, license: License, current_node_count: int) -> bool:
         """Check if a new certificate can be issued within the license limit.
 
         Returns True if under the limit, False if at or over limit.
@@ -494,7 +514,9 @@ class LicenseEnforcer:
         return {
             "tier": tier.value,
             "max_nodes": NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)),
-            "features": TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])),
+            "features": TIER_FEATURES.get(
+                tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+            ),
             "pricing": TIER_PRICING.get(tier, TIER_PRICING.get(tier.value, {})),
         }
 
@@ -525,11 +547,13 @@ class LicenseEnforcer:
         current_idx = tier_order.index(current_tier)
 
         upgrades = {}
-        for tier in tier_order[current_idx + 1:]:
+        for tier in tier_order[current_idx + 1 :]:
             upgrades[tier.value] = {
                 "pricing": TIER_PRICING.get(tier, TIER_PRICING.get(tier.value, {})),
                 "max_nodes": NODE_LIMITS.get(tier, NODE_LIMITS.get(tier.value, 3)),
-                "features": TIER_FEATURES.get(tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])),
+                "features": TIER_FEATURES.get(
+                    tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
+                ),
             }
 
         return upgrades

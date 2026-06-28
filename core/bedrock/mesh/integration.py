@@ -15,33 +15,36 @@ so that no isolated node can continue to access protected resources.
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set
+from datetime import UTC, datetime
 
-from bedrock.identity.node import Node, NodeState
-from bedrock.identity.certificates import CertificateManager
-from bedrock.identity.registration import NodeRegistry
-from bedrock.data_separation.consent import ConsentGate
 from bedrock.audit.chain import AuditChain
+from bedrock.data_separation.consent import ConsentGate
+from bedrock.identity.certificates import CertificateManager
+from bedrock.identity.node import NodeState
 from bedrock.key_management.keys import KeyManager
-from bedrock.mesh.healing import SelfHealingMesh, HealingResult
-from bedrock.mesh.detector import DetectionSignal, SignalType
-from bedrock.mesh.state_machine import TransitionRecord
+from bedrock.mesh.healing import SelfHealingMesh
 
 
 class MeshEvent:
     """An integration event triggered by a mesh state change."""
 
-    def __init__(self, event_type: str, node_id: str, old_state: NodeState,
-                 new_state: NodeState, reason: str,
-                 actions_taken: List[str], timestamp: Optional[datetime] = None):
+    def __init__(
+        self,
+        event_type: str,
+        node_id: str,
+        old_state: NodeState,
+        new_state: NodeState,
+        reason: str,
+        actions_taken: list[str],
+        timestamp: datetime | None = None,
+    ):
         self.event_type = event_type
         self.node_id = node_id
         self.old_state = old_state
         self.new_state = new_state
         self.reason = reason
         self.actions_taken = actions_taken
-        self.timestamp = timestamp or datetime.now(timezone.utc)
+        self.timestamp = timestamp or datetime.now(UTC)
 
     def to_dict(self) -> dict:
         return {
@@ -69,19 +72,22 @@ class MeshIntegrator:
     protected resources through any subsystem.
     """
 
-    def __init__(self, mesh: SelfHealingMesh,
-                 cert_manager: Optional[CertificateManager] = None,
-                 audit_chain: Optional[AuditChain] = None,
-                 key_manager: Optional[KeyManager] = None,
-                 consent_gate: Optional[ConsentGate] = None):
+    def __init__(
+        self,
+        mesh: SelfHealingMesh,
+        cert_manager: CertificateManager | None = None,
+        audit_chain: AuditChain | None = None,
+        key_manager: KeyManager | None = None,
+        consent_gate: ConsentGate | None = None,
+    ):
         self.mesh = mesh
         self.cert_manager = cert_manager
         self.audit_chain = audit_chain
         self.key_manager = key_manager
         self.consent_gate = consent_gate
-        self._events: List[MeshEvent] = []
-        self._quarantined_nodes: Set[str] = set()
-        self._revoked_nodes: Set[str] = set()
+        self._events: list[MeshEvent] = []
+        self._quarantined_nodes: set[str] = set()
+        self._revoked_nodes: set[str] = set()
 
     def on_quarantine(self, node_id: str, reason: str = "Consensus quarantine") -> MeshEvent:
         """Handle a node being quarantined.
@@ -218,7 +224,7 @@ class MeshIntegrator:
             try:
                 # Get the node's registration info
                 cm = self.cert_manager
-                cert = cm.issue_certificate(
+                cm.issue_certificate(
                     node_uuid=node_id,
                     node_name=node.name,
                     public_key_hash=node.node_id.public_key_hex(),
@@ -268,18 +274,19 @@ class MeshIntegrator:
         """Check if a node is permanently revoked."""
         return node_id in self._revoked_nodes
 
-    def get_blocked_nodes(self) -> Set[str]:
+    def get_blocked_nodes(self) -> set[str]:
         """Get all blocked (quarantined + revoked) node IDs."""
         return self._quarantined_nodes | self._revoked_nodes
 
-    def get_events(self, node_id: Optional[str] = None) -> List[MeshEvent]:
+    def get_events(self, node_id: str | None = None) -> list[MeshEvent]:
         """Get integration events, optionally filtered by node_id."""
         if node_id:
             return [e for e in self._events if e.node_id == node_id]
         return list(self._events)
 
-    def process_full_quarantine(self, node_id: str,
-                                 reason: str = "Consensus quarantine") -> List[MeshEvent]:
+    def process_full_quarantine(
+        self, node_id: str, reason: str = "Consensus quarantine"
+    ) -> list[MeshEvent]:
         """Full quarantine flow: flag -> consensus -> quarantine -> integrate.
 
         This is the complete flow when the mesh detects an attack:
@@ -298,8 +305,9 @@ class MeshIntegrator:
 
         return events
 
-    def process_full_revocation(self, node_id: str,
-                                 reason: str = "Confirmed malicious") -> List[MeshEvent]:
+    def process_full_revocation(
+        self, node_id: str, reason: str = "Confirmed malicious"
+    ) -> list[MeshEvent]:
         """Full revocation flow: quarantine -> revoke -> integrate.
 
         Returns list of events generated.
@@ -317,7 +325,7 @@ class MeshIntegrator:
 
         return events
 
-    def process_full_healing(self, node_id: str) -> List[MeshEvent]:
+    def process_full_healing(self, node_id: str) -> list[MeshEvent]:
         """Full healing flow: begin_healing -> complete_healing -> integrate.
 
         If the node is already in HEALING state, skip begin_healing and

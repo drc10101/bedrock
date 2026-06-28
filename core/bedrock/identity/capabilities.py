@@ -8,7 +8,6 @@ by the Encryption Engine (AAD), Access Control, and Self-Healing Mesh.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List
 
 
 class DataCategory(Enum):
@@ -16,13 +15,14 @@ class DataCategory(Enum):
 
     Each vertical template defines its own categories. These are the base set.
     """
-    IDENTITY = "identity"       # PII: names, DOB, SSN, address
-    MEDICAL = "medical"         # Health records, conditions, medications
-    TRANSACTION = "transaction" # Financial transactions
-    PORTFOLIO = "portfolio"     # Investment positions, strategies
+
+    IDENTITY = "identity"  # PII: names, DOB, SSN, address
+    MEDICAL = "medical"  # Health records, conditions, medications
+    TRANSACTION = "transaction"  # Financial transactions
+    PORTFOLIO = "portfolio"  # Investment positions, strategies
     INTELLIGENCE = "intelligence"  # Classified/sensitive intel
-    AUTH = "auth"                # Credentials, sessions, MFA
-    AUDIT = "audit"            # Audit chain entries
+    AUTH = "auth"  # Credentials, sessions, MFA
+    AUDIT = "audit"  # Audit chain entries
 
 
 @dataclass
@@ -35,9 +35,10 @@ class CapabilityScope:
     - Access Control: RBAC checks against scope
     - Mesh: rerouting respects scope boundaries
     """
+
     node_id: str
-    categories: List[DataCategory] = field(default_factory=list)
-    operations: List[str] = field(default_factory=lambda: ["read"])  # read, write, consent
+    categories: list[DataCategory] = field(default_factory=list)
+    operations: list[str] = field(default_factory=lambda: ["read"])  # read, write, consent
 
     def can_access(self, category: DataCategory) -> bool:
         """Check if this scope includes the given data category."""

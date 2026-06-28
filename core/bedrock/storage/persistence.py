@@ -9,17 +9,15 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import json
-import time
 from datetime import datetime
-from typing import Optional
 
-from bedrock.storage.sqlite_backend import SQLiteBackend
-from bedrock.identity.registration import NodeRegistry, Node, NodeState
-from bedrock.identity.certificates import CertificateManager, Certificate
-from bedrock.data_separation.silo import SiloManager, Silo
-from bedrock.data_separation.consent import ConsentGate, ConsentEvent
 from bedrock.audit.chain import AuditChain, AuditEntry
+from bedrock.data_separation.consent import ConsentEvent, ConsentGate
+from bedrock.data_separation.silo import Silo, SiloManager
+from bedrock.identity.certificates import CertificateManager
+from bedrock.identity.registration import Node, NodeRegistry
 from bedrock.licensing.keygen import LicenseKeygen, SigningKey
+from bedrock.storage.sqlite_backend import SQLiteBackend
 
 
 class PersistentBedrock:
@@ -44,13 +42,13 @@ class PersistentBedrock:
 
     def __init__(
         self,
-        storage: Optional[SQLiteBackend] = None,
-        registry: Optional[NodeRegistry] = None,
-        cert_manager: Optional[CertificateManager] = None,
-        silo_manager: Optional[SiloManager] = None,
-        consent_gate: Optional[ConsentGate] = None,
-        audit_chain: Optional[AuditChain] = None,
-        keygen: Optional[LicenseKeygen] = None,
+        storage: SQLiteBackend | None = None,
+        registry: NodeRegistry | None = None,
+        cert_manager: CertificateManager | None = None,
+        silo_manager: SiloManager | None = None,
+        consent_gate: ConsentGate | None = None,
+        audit_chain: AuditChain | None = None,
+        keygen: LicenseKeygen | None = None,
     ):
         self.storage = storage or SQLiteBackend("bedrock.db")
 
@@ -72,19 +70,21 @@ class PersistentBedrock:
 
     def save_node(self, node: Node) -> None:
         """Persist a node to the database."""
-        self.storage.save_node({
-            "uuid": node.node_id.uuid,
-            "name": node.name,
-            "node_type": node.node_type,
-            "state": node.state.value if hasattr(node.state, "value") else str(node.state),
-            "public_key_hex": node.node_id.public_key_hex(),
-            "metadata": json.dumps(node.metadata) if node.metadata else "{}",
-        })
+        self.storage.save_node(
+            {
+                "uuid": node.node_id.uuid,
+                "name": node.name,
+                "node_type": node.node_type,
+                "state": node.state.value if hasattr(node.state, "value") else str(node.state),
+                "public_key_hex": node.node_id.public_key_hex(),
+                "metadata": json.dumps(node.metadata) if node.metadata else "{}",
+            }
+        )
 
     def save_all_nodes(self) -> int:
         """Persist all registered nodes. Returns count saved."""
         count = 0
-        for uuid, node in self.registry._nodes.items():
+        for _uuid, node in self.registry._nodes.items():
             self.save_node(node)
             count += 1
         return count
@@ -101,7 +101,7 @@ class PersistentBedrock:
             if self.registry.get(uuid) is not None:
                 continue
             try:
-                node = self.registry.register(
+                self.registry.register(
                     name=data["name"],
                     node_type=data["node_type"],
                     metadata=json.loads(data.get("metadata", "{}")),
@@ -145,18 +145,22 @@ class PersistentBedrock:
 
     def save_silo(self, silo: Silo) -> None:
         """Persist a silo to the database."""
-        self.storage.save_silo({
-            "name": silo.name,
-            "display_name": silo.display_name,
-            "categories": json.dumps(list(silo.categories)) if hasattr(silo, "categories") else "[]",
-            "description": getattr(silo, "description", ""),
-            "encrypted": getattr(silo, "encrypted", False),
-        })
+        self.storage.save_silo(
+            {
+                "name": silo.name,
+                "display_name": silo.display_name,
+                "categories": (
+                    json.dumps(list(silo.categories)) if hasattr(silo, "categories") else "[]"
+                ),
+                "description": getattr(silo, "description", ""),
+                "encrypted": getattr(silo, "encrypted", False),
+            }
+        )
 
     def save_all_silos(self) -> int:
         """Persist all silos. Returns count saved."""
         count = 0
-        for name, silo in self.silo_manager._silos.items():
+        for _name, silo in self.silo_manager._silos.items():
             self.save_silo(silo)
             count += 1
         return count
@@ -165,11 +169,11 @@ class PersistentBedrock:
         """Restore silos from the database. Returns count restored."""
         saved = self.storage.load_silos()
         count = 0
-        for silo_id, data in saved.items():
+        for _silo_id, data in saved.items():
             if self.silo_manager._silos.get(data.get("name")) is not None:
                 continue
             try:
-                silo = self.silo_manager.create_silo(
+                self.silo_manager.create_silo(
                     name=data["name"],
                     display_name=data.get("display_name", data["name"]),
                     categories=json.loads(data.get("categories", "[]")),
@@ -183,18 +187,22 @@ class PersistentBedrock:
 
     def save_consent(self, event: ConsentEvent) -> None:
         """Persist a consent event to the database."""
-        self.storage.save_consent({
-            "consent_id": event.consent_id,
-            "requesting_node_id": event.requesting_node_id,
-            "data_owner_id": getattr(event, "data_owner_id", ""),
-            "source_silo": event.source_silo,
-            "target_silo": event.target_silo,
-            "categories": json.dumps(list(event.categories)) if hasattr(event, "categories") else "[]",
-            "scope": event.scope,
-            "reason": getattr(event, "reason", ""),
-            "status": event.status,
-            "created_at": self._dt_to_str(getattr(event, "created_at", "")),
-        })
+        self.storage.save_consent(
+            {
+                "consent_id": event.consent_id,
+                "requesting_node_id": event.requesting_node_id,
+                "data_owner_id": getattr(event, "data_owner_id", ""),
+                "source_silo": event.source_silo,
+                "target_silo": event.target_silo,
+                "categories": (
+                    json.dumps(list(event.categories)) if hasattr(event, "categories") else "[]"
+                ),
+                "scope": event.scope,
+                "reason": getattr(event, "reason", ""),
+                "status": event.status,
+                "created_at": self._dt_to_str(getattr(event, "created_at", "")),
+            }
+        )
 
     def restore_consents(self) -> int:
         """Restore consent events from the database. Returns count restored."""
@@ -252,7 +260,7 @@ class PersistentBedrock:
         """Restore audit chain entries from the database. Returns count restored."""
         saved = self.storage.load_audit_chain()
         count = 0
-        for entry_id, data in saved.items():
+        for _entry_id, data in saved.items():
             try:
                 details_raw = data.get("details", "{}")
                 details = json.loads(details_raw) if isinstance(details_raw, str) else details_raw
@@ -277,7 +285,7 @@ class PersistentBedrock:
     def save_all_signing_keys(self) -> int:
         """Persist all signing keys. Returns count saved."""
         count = 0
-        for key_id, key in self.keygen._keys.items():
+        for _key_id, key in self.keygen._keys.items():
             self.save_signing_key(key)
             count += 1
         return count

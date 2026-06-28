@@ -13,10 +13,9 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from collections import deque
-from typing import List, Optional, Dict, Set
 
-from bedrock.identity.node import Node, NodeState
 from bedrock.identity.capabilities import CapabilityScope, DataCategory
+from bedrock.identity.node import Node, NodeState
 
 
 class MeshRouter:
@@ -31,8 +30,8 @@ class MeshRouter:
     """
 
     def __init__(self):
-        self._topology: Dict[str, Set[str]] = {}  # node_id -> {neighbor_ids}
-        self._scopes: Dict[str, CapabilityScope] = {}  # node_id -> scope
+        self._topology: dict[str, set[str]] = {}  # node_id -> {neighbor_ids}
+        self._scopes: dict[str, CapabilityScope] = {}  # node_id -> scope
 
     def register_neighbor(self, node_id: str, neighbor_id: str) -> None:
         """Register a neighbor relationship in the topology.
@@ -60,8 +59,9 @@ class MeshRouter:
         """Register a capability scope for a node."""
         self._scopes[node_id] = scope
 
-    def _can_relay(self, node_id: str, data_categories: List[DataCategory],
-                   nodes: Dict[str, Node]) -> bool:
+    def _can_relay(
+        self, node_id: str, data_categories: list[DataCategory], nodes: dict[str, Node]
+    ) -> bool:
         """Check if a node can relay data for the given categories.
 
         A node can relay if:
@@ -85,9 +85,13 @@ class MeshRouter:
 
         return all(scope.can_access(cat) for cat in data_categories)
 
-    def find_path(self, source_id: str, target_id: str,
-                  data_categories: List[DataCategory],
-                  nodes: Dict[str, Node]) -> List[str]:
+    def find_path(
+        self,
+        source_id: str,
+        target_id: str,
+        data_categories: list[DataCategory],
+        nodes: dict[str, Node],
+    ) -> list[str]:
         """Find a route from source to target for the given data categories.
 
         Uses BFS for shortest path. Only includes nodes whose capability
@@ -134,10 +138,14 @@ class MeshRouter:
 
         return []  # No path found
 
-    def find_alternate_path(self, source_id: str, target_id: str,
-                           data_categories: List[DataCategory],
-                           nodes: Dict[str, Node],
-                           exclude_path: List[str]) -> List[str]:
+    def find_alternate_path(
+        self,
+        source_id: str,
+        target_id: str,
+        data_categories: list[DataCategory],
+        nodes: dict[str, Node],
+        exclude_path: list[str],
+    ) -> list[str]:
         """Find an alternate route that avoids the given path's nodes.
 
         Used when a path fails or a node is quarantined.
@@ -187,14 +195,13 @@ class MeshRouter:
 
         return []  # No alternate path found
 
-    def verify_redundancy(self, nodes: Dict[str, Node],
-                          min_alternates: int = 1) -> Dict[str, int]:
+    def verify_redundancy(self, nodes: dict[str, Node], min_alternates: int = 1) -> dict[str, int]:
         """Verify that every node has at least min_alternates alternate routes.
 
         Returns a dict of node_id -> number of alternate routes available.
         Nodes below the threshold should be flagged.
         """
-        result: Dict[str, int] = {}
+        result: dict[str, int] = {}
         node_ids = list(self._topology.keys())
 
         for source_id in node_ids:
@@ -209,15 +216,14 @@ class MeshRouter:
                     continue
 
                 # Find primary path
-                primary = self.find_path(source_id, target_id,
-                                        scope.categories, nodes)
+                primary = self.find_path(source_id, target_id, scope.categories, nodes)
                 if not primary:
                     continue
 
                 # Find alternate path
-                alternate = self.find_alternate_path(source_id, target_id,
-                                                     scope.categories, nodes,
-                                                     primary)
+                alternate = self.find_alternate_path(
+                    source_id, target_id, scope.categories, nodes, primary
+                )
                 if alternate:
                     alternate_count += 1
 
@@ -225,10 +231,10 @@ class MeshRouter:
 
         return result
 
-    def get_topology(self) -> Dict[str, Set[str]]:
+    def get_topology(self) -> dict[str, set[str]]:
         """Return the current topology map."""
         return {k: set(v) for k, v in self._topology.items()}
 
-    def get_neighbors(self, node_id: str) -> Set[str]:
+    def get_neighbors(self, node_id: str) -> set[str]:
         """Get the neighbors of a node."""
         return self._topology.get(node_id, set())

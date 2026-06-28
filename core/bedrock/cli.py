@@ -16,7 +16,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 # Add parent to path for imports
@@ -24,8 +23,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bedrock.config import CoreConfig
 from bedrock.health import HealthChecker
-from bedrock.licensing.keygen import LicenseKeygen, SigningKey
 from bedrock.licensing.enforcement import LicenseEnforcer, LicenseTier
+from bedrock.licensing.keygen import LicenseKeygen
 
 VERSION = "0.3.0"
 
@@ -79,6 +78,7 @@ def cmd_init(args):
 
     # Generate a master encryption key
     import secrets
+
     master_key_path = project_dir / "data" / "keys" / "master.key"
     if not master_key_path.exists():
         master_key = secrets.token_hex(32)  # 256-bit key
@@ -157,7 +157,7 @@ def cmd_serve(args):
         except json.JSONDecodeError:
             print("Warning: BEDROCK_API_KEYS env var is not valid JSON, using empty keys")
 
-    print(f"Starting Bedrock API server...")
+    print("Starting Bedrock API server...")
     print(f"  Host: {args.host}")
     print(f"  Port: {args.port}")
     print(f"  Environment: {config.environment}")
@@ -184,7 +184,7 @@ def cmd_keygen(args):
     keys_path = Path(args.keys_file)
     keygen.export_keys_file(keys_path)
 
-    print(f"Signing key generated:")
+    print("Signing key generated:")
     print(f"  Key ID:    {signing_key.key_id}")
     print(f"  Algorithm: {signing_key.algorithm}")
     print(f"  Created:   {signing_key.created_at}")
@@ -241,7 +241,7 @@ def _license_issue(args):
         features=features or None,
     )
 
-    print(f"License key issued:")
+    print("License key issued:")
     print(f"  Key:      {license_key}")
     print(f"  Tier:     {args.tier}")
     print(f"  Licensee: {args.licensee}")
@@ -259,27 +259,30 @@ def _license_issue(args):
 
 def _license_validate(args):
     """Validate a license key."""
-    from bedrock.licensing.enforcement import LicenseValidationError, LicenseExpiredError
+    from bedrock.licensing.enforcement import LicenseValidationError
+
     enforcer = LicenseEnforcer()
     try:
         license_obj = enforcer.validate_license(args.key)
-        print(f"License validation result:")
+        print("License validation result:")
         print(f"  Valid:    {license_obj.is_valid}")
         if license_obj.is_valid:
             print(f"  Tier:     {license_obj.tier.value}")
             print(f"  Licensee: {license_obj.issued_to}")
             print(f"  Expires:  {license_obj.expires_at}")
-            if hasattr(license_obj, 'features') and license_obj.features:
-                print(f"  Features: {', '.join(license_obj.features) if isinstance(license_obj.features, list) else license_obj.features}")
+            if hasattr(license_obj, "features") and license_obj.features:
+                print(
+                    f"  Features: {', '.join(license_obj.features) if isinstance(license_obj.features, list) else license_obj.features}"
+                )
             if license_obj.is_expired():
-                print(f"  WARNING: License has expired")
+                print("  WARNING: License has expired")
             return 0
         else:
-            print(f"  Reason:   Invalid license")
+            print("  Reason:   Invalid license")
             return 1
     except LicenseValidationError as e:
-        print(f"License validation result:")
-        print(f"  Valid:    False")
+        print("License validation result:")
+        print("  Valid:    False")
         print(f"  Reason:   {str(e)}")
         return 1
 
@@ -303,7 +306,7 @@ def _license_info(args):
     """Show info about a license key (parse without full validation)."""
     parts = args.key.split(":")
     if len(parts) >= 2:
-        print(f"License key info:")
+        print("License key info:")
         print(f"  Version: {parts[0] if parts else 'unknown'}")
         print(f"  Key:     {args.key[:20]}...")
     else:
@@ -317,7 +320,7 @@ def cmd_health(args):
     checker = HealthChecker(config)
     report = checker.check()
 
-    print(f"Bedrock Health Check")
+    print("Bedrock Health Check")
     print(f"{'=' * 40}")
     print(f"Overall: {'HEALTHY' if report.is_healthy() else 'UNHEALTHY'}")
     print()
@@ -339,7 +342,7 @@ def cmd_status(args):
     """Show system status and configuration summary."""
     config = CoreConfig.from_env()
 
-    print(f"Bedrock Status")
+    print("Bedrock Status")
     print(f"{'=' * 40}")
     print(f"  Version:      {VERSION}")
     print(f"  Environment:  {config.environment}")
@@ -349,29 +352,29 @@ def cmd_status(args):
     print(f"  Log level:    {config.log_level}")
     print(f"  Log format:   {config.log_format}")
     print()
-    print(f"  Encryption:")
+    print("  Encryption:")
     print(f"    Cipher:     {config.encryption.field_cipher}")
     print(f"    E2EE curve:  {config.encryption.e2ee_curve}")
     print(f"    HKDF hash:  {config.encryption.hkdf_hash}")
     print()
-    print(f"  Identity:")
+    print("  Identity:")
     print(f"    Node ID v:  {config.identity.node_id_version}")
     print(f"    Cert TTL:   {config.identity.cert_default_ttl_hours}h")
     print(f"    Key type:   {config.identity.cert_key_type}")
     print()
-    print(f"  Data Separation:")
+    print("  Data Separation:")
     print(f"    Strict mode: {config.data_separation.silo_strict_mode}")
     print(f"    Encryption:  {config.data_separation.silo_default_encryption}")
     print()
-    print(f"  Audit:")
+    print("  Audit:")
     print(f"    Hash algo:   {config.audit.hash_algo}")
     print(f"    Retention:   {config.audit.retention_years} years")
     print()
-    print(f"  Access Control:")
+    print("  Access Control:")
     print(f"    RBAC:        {config.access_control.rbac_enforce}")
     print(f"    MFA:         {config.access_control.mfa_required}")
     print()
-    print(f"  Licensing:")
+    print("  Licensing:")
     print(f"    Dev nodes:   {config.licensing.dev_max_nodes}")
     print(f"    CA activated: {config.licensing.runtime_ca_activated}")
     print(f"    Phone home:  {config.licensing.phone_home_enabled}")
@@ -387,17 +390,17 @@ def cmd_trial(args):
     # Validate it immediately to show details
     license_obj = enforcer.validate_license(license_key)
 
-    print(f"Bedrock Trial License")
+    print("Bedrock Trial License")
     print(f"{'=' * 40}")
     print(f"  License key: {license_key}")
     print(f"  Tier:        {license_obj.tier.value}")
     print(f"  Licensee:    {license_obj.issued_to}")
     print(f"  Nodes:       {license_obj.max_nodes}")
-    print(f"  Expires:     30 days from now")
+    print("  Expires:     30 days from now")
     print(f"  Features:    {', '.join(license_obj.features)}")
     print()
-    print(f"Save this key to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY.")
-    print(f"After 30 days, upgrade at https://bedrock.dev/pricing")
+    print("Save this key to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY.")
+    print("After 30 days, upgrade at https://bedrock.dev/pricing")
     return 0
 
 
@@ -420,7 +423,10 @@ def cmd_checkout(args):
         )
     except ValueError as e:
         print(f"Configuration error: {e}", file=sys.stderr)
-        print("Make sure BEDROCK_STRIPE_SECRET_KEY and BEDROCK_STRIPE_PRICE_* are set.", file=sys.stderr)
+        print(
+            "Make sure BEDROCK_STRIPE_SECRET_KEY and BEDROCK_STRIPE_PRICE_* are set.",
+            file=sys.stderr,
+        )
         return 1
     except Exception as e:
         print(f"Stripe error: {e}", file=sys.stderr)
@@ -431,7 +437,7 @@ def cmd_checkout(args):
     print(f"  Session ID: {result.session_id}")
     print(f"  Checkout URL: {result.session_url}")
     print()
-    print(f"  Open the checkout URL in a browser to complete payment.")
+    print("  Open the checkout URL in a browser to complete payment.")
     return 0
 
 
@@ -476,30 +482,40 @@ def build_parser():
 
     # init
     init_parser = subparsers.add_parser("init", help="Initialize a new Bedrock project")
-    init_parser.add_argument("directory", nargs="?", default=".", help="Project directory (default: current)")
+    init_parser.add_argument(
+        "directory", nargs="?", default=".", help="Project directory (default: current)"
+    )
     init_parser.set_defaults(func=cmd_init)
 
     # serve
     serve_parser = subparsers.add_parser("serve", help="Start the API server")
     serve_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     serve_parser.add_argument("--port", type=int, default=8443, help="Bind port (default: 8443)")
-    serve_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
+    serve_parser.add_argument(
+        "--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file"
+    )
     serve_parser.add_argument("--no-metering", action="store_true", help="Disable usage metering")
     serve_parser.set_defaults(func=cmd_serve)
 
     # keygen
     keygen_parser = subparsers.add_parser("keygen", help="Generate a signing key")
     keygen_parser.add_argument("--key-id", help="Custom key ID (auto-generated if omitted)")
-    keygen_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
+    keygen_parser.add_argument(
+        "--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file"
+    )
     keygen_parser.set_defaults(func=cmd_keygen)
 
     # license
     license_parser = subparsers.add_parser("license", help="License management")
-    license_parser.add_argument("license_action", choices=["issue", "validate", "revoke", "info"],
-                                help="License action")
-    license_parser.add_argument("--tier", default="developer",
-                                choices=["trial", "developer", "starter", "business", "enterprise"],
-                                help="License tier")
+    license_parser.add_argument(
+        "license_action", choices=["issue", "validate", "revoke", "info"], help="License action"
+    )
+    license_parser.add_argument(
+        "--tier",
+        default="developer",
+        choices=["trial", "developer", "starter", "business", "enterprise"],
+        help="License tier",
+    )
     license_parser.add_argument("--licensee", default="unknown", help="Licensee name or ID")
     license_parser.add_argument("--nodes", type=int, default=3, help="Max nodes for license")
     license_parser.add_argument("--days", type=int, help="License validity in days")
@@ -507,28 +523,48 @@ def build_parser():
     license_parser.add_argument("--key", help="License key to validate/info")
     license_parser.add_argument("--key-id", help="Signing key ID to revoke")
     license_parser.add_argument("--reason", help="Reason for revocation")
-    license_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
+    license_parser.add_argument(
+        "--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file"
+    )
     license_parser.set_defaults(func=cmd_license)
 
     # trial
     trial_parser = subparsers.add_parser("trial", help="Generate a free 30-day trial license")
-    trial_parser.add_argument("--licensee", default="trial-user", help="Name or email for the trial")
-    trial_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
+    trial_parser.add_argument(
+        "--licensee", default="trial-user", help="Name or email for the trial"
+    )
+    trial_parser.add_argument(
+        "--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file"
+    )
     trial_parser.set_defaults(func=cmd_trial)
 
     # checkout
-    checkout_parser = subparsers.add_parser("checkout", help="Create a Stripe checkout session for paid license")
-    checkout_parser.add_argument("--tier", required=True, choices=["developer_individual", "developer_team"],
-                                help="License tier to purchase")
+    checkout_parser = subparsers.add_parser(
+        "checkout", help="Create a Stripe checkout session for paid license"
+    )
+    checkout_parser.add_argument(
+        "--tier",
+        required=True,
+        choices=["developer_individual", "developer_team"],
+        help="License tier to purchase",
+    )
     checkout_parser.add_argument("--email", help="Customer email (pre-fills checkout)")
-    checkout_parser.add_argument("--success-url", default="https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
-                                help="URL to redirect on success")
-    checkout_parser.add_argument("--cancel-url", default="https://bedrock.dev/license/cancel",
-                                help="URL to redirect on cancellation")
+    checkout_parser.add_argument(
+        "--success-url",
+        default="https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
+        help="URL to redirect on success",
+    )
+    checkout_parser.add_argument(
+        "--cancel-url",
+        default="https://bedrock.dev/license/cancel",
+        help="URL to redirect on cancellation",
+    )
     checkout_parser.set_defaults(func=cmd_checkout)
 
     # webhook
-    webhook_parser = subparsers.add_parser("webhook", help="Start the Stripe webhook server for license delivery")
+    webhook_parser = subparsers.add_parser(
+        "webhook", help="Start the Stripe webhook server for license delivery"
+    )
     webhook_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
     webhook_parser.add_argument("--port", type=int, default=8444, help="Bind port (default: 8444)")
     webhook_parser.set_defaults(func=cmd_webhook)
@@ -563,6 +599,7 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
         if os.environ.get("BEDROCK_DEBUG"):
             import traceback
+
             traceback.print_exc()
         return 1
 

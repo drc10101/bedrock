@@ -17,21 +17,17 @@ Environment variables:
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-import base64
-import hashlib
-import hmac
-import json
 import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 import stripe
 
 
 class CheckoutTier(Enum):
     """Map Stripe price IDs to Bedrock license tiers."""
+
     DEVELOPER_INDIVIDUAL = "developer_individual"
     DEVELOPER_TEAM = "developer_team"
 
@@ -39,21 +35,23 @@ class CheckoutTier(Enum):
 @dataclass
 class CheckoutResult:
     """Result of creating a checkout session."""
+
     session_id: str
     session_url: str
     tier: CheckoutTier
     price_id: str
-    customer_email: Optional[str] = None
+    customer_email: str | None = None
 
 
 @dataclass
 class LicenseDelivery:
     """License key issued after successful payment."""
+
     license_key: str
     tier: str
     issued_to: str
     customer_email: str
-    expires_at: Optional[float]
+    expires_at: float | None
     max_nodes: int
     features: list = field(default_factory=list)
     issued_at: float = field(default_factory=time.time)
@@ -70,10 +68,10 @@ def configure_stripe():
 
 def create_checkout_session(
     tier: CheckoutTier,
-    customer_email: Optional[str] = None,
+    customer_email: str | None = None,
     success_url: str = "https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
     cancel_url: str = "https://bedrock.dev/license/cancel",
-    metadata: Optional[dict] = None,
+    metadata: dict | None = None,
 ) -> CheckoutResult:
     """Create a Stripe Checkout Session for a Bedrock license purchase.
 
@@ -96,8 +94,10 @@ def create_checkout_session(
     }
     price_id = price_map.get(tier)
     if not price_id:
-        raise ValueError(f"No price ID configured for tier {tier.value}. "
-                         f"Set the corresponding BEDROCK_STRIPE_PRICE_* environment variable.")
+        raise ValueError(
+            f"No price ID configured for tier {tier.value}. "
+            f"Set the corresponding BEDROCK_STRIPE_PRICE_* environment variable."
+        )
 
     product_id = os.environ.get("BEDROCK_STRIPE_PRODUCT_ID")
 
@@ -165,12 +165,14 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
     Returns:
         LicenseDelivery with the issued license key and details.
     """
-    from bedrock.licensing.enforcement import LicenseEnforcer, LicenseTier, NODE_LIMITS
+    from bedrock.licensing.enforcement import LicenseEnforcer, LicenseTier
 
     session = event["data"]["object"]
     metadata = session.get("metadata", {})
     tier_str = metadata.get("bedrock_tier", "developer_individual")
-    customer_email = session.get("customer_email", "") or session.get("customer_details", {}).get("email", "")
+    customer_email = session.get("customer_email", "") or session.get("customer_details", {}).get(
+        "email", ""
+    )
 
     # Map checkout tier to license tier
     tier_map = {

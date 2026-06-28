@@ -22,15 +22,15 @@ timestamp mismatches and makes the wire format self-contained.
 import base64
 import os
 import struct
-from typing import Optional, Tuple
 
-from cryptography.hazmat.primitives.asymmetric.ec import (
-    ECDH, EllipticCurvePrivateKey, EllipticCurvePublicKey,
-    generate_private_key, SECP256R1,
-)
-from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    ECDH,
+    SECP256R1,
+    generate_private_key,
+)
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from bedrock.encryption.aad import AAD, build_aad
 from bedrock.encryption.version import CiphertextFormat
@@ -52,8 +52,9 @@ class FieldEncryptor:
         self._key_manager = key_manager
         self._master_key = master_key
 
-    def encrypt(self, plaintext: str, silo: str, record_id: str,
-                scope: str, operation: str = "field") -> str:
+    def encrypt(
+        self, plaintext: str, silo: str, record_id: str, scope: str, operation: str = "field"
+    ) -> str:
         """Encrypt a field value with AAD binding.
 
         Args:
@@ -88,20 +89,21 @@ class FieldEncryptor:
 
         # Wire format: aad_len[2B] || aad_json || iv[12B] || ct+tag
         aad_encoded = aad_string.encode("utf-8")
-        packed = (
-            struct.pack(">H", len(aad_encoded))
-            + aad_encoded
-            + nonce
-            + ciphertext_with_tag
-        )
+        packed = struct.pack(">H", len(aad_encoded)) + aad_encoded + nonce + ciphertext_with_tag
 
         # Encode with version prefix
         encoded = base64.urlsafe_b64encode(packed).decode().rstrip("=")
         return f"{CiphertextFormat.V2_GCM.value}{encoded}"
 
-    def decrypt(self, ciphertext: str, silo: str, record_id: str,
-                scope: str, operation: str = "field",
-                key_version: Optional[int] = None) -> str:
+    def decrypt(
+        self,
+        ciphertext: str,
+        silo: str,
+        record_id: str,
+        scope: str,
+        operation: str = "field",
+        key_version: int | None = None,
+    ) -> str:
         """Decrypt a field value. Validates AAD matches expected context.
 
         The AAD is embedded in the ciphertext, so we extract it and verify
@@ -125,17 +127,22 @@ class FieldEncryptor:
         fmt = CiphertextFormat.detect(ciphertext)
 
         if fmt == CiphertextFormat.V2_GCM:
-            return self._decrypt_v2(ciphertext, silo, record_id, scope,
-                                    operation, key_version)
+            return self._decrypt_v2(ciphertext, silo, record_id, scope, operation, key_version)
 
         raise ValueError(f"Unsupported ciphertext format: {fmt}")
 
-    def _decrypt_v2(self, ciphertext: str, silo: str, record_id: str,
-                     scope: str, operation: str,
-                     key_version: Optional[int] = None) -> str:
+    def _decrypt_v2(
+        self,
+        ciphertext: str,
+        silo: str,
+        record_id: str,
+        scope: str,
+        operation: str,
+        key_version: int | None = None,
+    ) -> str:
         """Decrypt v2 (AES-256-GCM) ciphertext with embedded AAD."""
         # Strip version prefix
-        encoded = ciphertext[len(CiphertextFormat.V2_GCM.value):]
+        encoded = ciphertext[len(CiphertextFormat.V2_GCM.value) :]
 
         # Restore base64 padding
         padding = 4 - len(encoded) % 4
@@ -146,13 +153,13 @@ class FieldEncryptor:
 
         # Unpack: aad_len[2B] || aad_json || iv[12B] || ct+tag
         offset = 0
-        aad_len = struct.unpack(">H", packed[offset:offset+2])[0]
+        aad_len = struct.unpack(">H", packed[offset : offset + 2])[0]
         offset += 2
 
-        aad_string = packed[offset:offset+aad_len].decode("utf-8")
+        aad_string = packed[offset : offset + aad_len].decode("utf-8")
         offset += aad_len
 
-        nonce = packed[offset:offset+12]
+        nonce = packed[offset : offset + 12]
         offset += 12
 
         ciphertext_and_tag = packed[offset:]
@@ -168,10 +175,12 @@ class FieldEncryptor:
             scope=scope,
             timestamp=stored_aad.timestamp,  # Use stored timestamp
         )
-        if (stored_aad.operation != expected_aad.operation
-                or stored_aad.silo != expected_aad.silo
-                or stored_aad.record_id != expected_aad.record_id
-                or stored_aad.scope != expected_aad.scope):
+        if (
+            stored_aad.operation != expected_aad.operation
+            or stored_aad.silo != expected_aad.silo
+            or stored_aad.record_id != expected_aad.record_id
+            or stored_aad.scope != expected_aad.scope
+        ):
             raise ValueError(
                 f"Decryption failed: AAD context mismatch. "
                 f"Stored: op={stored_aad.operation} silo={stored_aad.silo} "
@@ -185,9 +194,7 @@ class FieldEncryptor:
 
         # Get silo key (specific version or active)
         if key_version is not None:
-            silo_key = self._key_manager.derive_silo_key(
-                self._master_key, silo, key_version
-            )
+            silo_key = self._key_manager.derive_silo_key(self._master_key, silo, key_version)
         else:
             silo_key = self._key_manager.get_silo_key(self._master_key, silo)
 
@@ -196,9 +203,7 @@ class FieldEncryptor:
         try:
             plaintext_bytes = aesgcm.decrypt(nonce, ciphertext_and_tag, aad_bytes)
         except Exception as e:
-            raise ValueError(
-                f"Decryption failed: wrong key or corrupted ciphertext."
-            ) from e
+            raise ValueError("Decryption failed: wrong key or corrupted ciphertext.") from e
 
         return plaintext_bytes.decode("utf-8")
 
@@ -226,11 +231,16 @@ class E2EEDeliverer:
     def __init__(self, config=None):
         self._config = config
 
-    def encrypt_for_recipient(self, plaintext: str, recipient_public_key: bytes,
-                              sender_private_key: Optional[bytes] = None,
-                              aad: Optional[AAD] = None,
-                              silo: str = "", record_id: str = "",
-                              scope: str = "e2ee") -> str:
+    def encrypt_for_recipient(
+        self,
+        plaintext: str,
+        recipient_public_key: bytes,
+        sender_private_key: bytes | None = None,
+        aad: AAD | None = None,
+        silo: str = "",
+        record_id: str = "",
+        scope: str = "e2ee",
+    ) -> str:
         """Encrypt data for a specific recipient's public key.
 
         Args:
@@ -305,11 +315,16 @@ class E2EEDeliverer:
         encoded = base64.urlsafe_b64encode(packed).decode().rstrip("=")
         return f"{CiphertextFormat.V2_GCM.value}{encoded}"
 
-    def decrypt_from_sender(self, ciphertext: str, sender_public_key: Optional[bytes] = None,
-                            recipient_private_key: bytes = None,
-                            aad: Optional[AAD] = None,
-                            silo: str = "", record_id: str = "",
-                            scope: str = "e2ee") -> str:
+    def decrypt_from_sender(
+        self,
+        ciphertext: str,
+        sender_public_key: bytes | None = None,
+        recipient_private_key: bytes = None,
+        aad: AAD | None = None,
+        silo: str = "",
+        record_id: str = "",
+        scope: str = "e2ee",
+    ) -> str:
         """Decrypt data received from a specific sender.
 
         The sender's ephemeral public key and AAD are embedded in the ciphertext,
@@ -328,7 +343,7 @@ class E2EEDeliverer:
             Decrypted plaintext string
         """
         # Strip version prefix
-        encoded = ciphertext[len(CiphertextFormat.V2_GCM.value):]
+        encoded = ciphertext[len(CiphertextFormat.V2_GCM.value) :]
 
         # Restore base64 padding
         padding = 4 - len(encoded) % 4
@@ -339,19 +354,19 @@ class E2EEDeliverer:
 
         # Unpack: aad_len[2B] || aad_json || eph_len[2B] || eph_pubkey || iv[12B] || ct+tag
         offset = 0
-        aad_len = struct.unpack(">H", packed[offset:offset+2])[0]
+        aad_len = struct.unpack(">H", packed[offset : offset + 2])[0]
         offset += 2
 
-        aad_string = packed[offset:offset+aad_len].decode("utf-8")
+        aad_string = packed[offset : offset + aad_len].decode("utf-8")
         offset += aad_len
 
-        eph_len = struct.unpack(">H", packed[offset:offset+2])[0]
+        eph_len = struct.unpack(">H", packed[offset : offset + 2])[0]
         offset += 2
 
-        ephemeral_pub_bytes = packed[offset:offset+eph_len]
+        ephemeral_pub_bytes = packed[offset : offset + eph_len]
         offset += eph_len
 
-        nonce = packed[offset:offset+12]
+        nonce = packed[offset : offset + 12]
         offset += 12
 
         ciphertext_and_tag = packed[offset:]
@@ -399,14 +414,12 @@ class E2EEDeliverer:
         try:
             plaintext_bytes = aesgcm.decrypt(nonce, ciphertext_and_tag, aad_bytes)
         except Exception as e:
-            raise ValueError(
-                f"E2EE decryption failed: wrong key or corrupted ciphertext."
-            ) from e
+            raise ValueError("E2EE decryption failed: wrong key or corrupted ciphertext.") from e
 
         return plaintext_bytes.decode("utf-8")
 
     @staticmethod
-    def generate_key_pair() -> Tuple[bytes, bytes]:
+    def generate_key_pair() -> tuple[bytes, bytes]:
         """Generate a new ECDH-P256 key pair for E2EE.
 
         Returns:

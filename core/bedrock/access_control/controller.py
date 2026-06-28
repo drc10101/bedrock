@@ -20,9 +20,8 @@ import secrets
 import struct
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 
 class Role(Enum):
@@ -31,6 +30,7 @@ class Role(Enum):
     The DENIED role is terminal — it means the account exists but all
     access is revoked. This is different from not having an account at all.
     """
+
     ADMIN = "admin"
     OPERATOR = "operator"
     VIEWER = "viewer"
@@ -44,6 +44,7 @@ class Portal(Enum):
     access provider portal resources, even with the same user ID.
     This prevents lateral movement between portals.
     """
+
     PATIENT = "patient"
     PROVIDER = "provider"
     ADMIN = "admin"
@@ -55,6 +56,7 @@ class Permission(Enum):
 
     Following the category.operation format from the audit chain.
     """
+
     # Data access
     DATA_READ = "data.read"
     DATA_WRITE = "data.write"
@@ -91,34 +93,54 @@ class Permission(Enum):
 # Portal restrictions are enforced separately — this mapping defines
 # what a role CAN do, the portal defines WHERE they can do it.
 
-DEFAULT_ROLE_PERMISSIONS: Dict[Role, FrozenSet[Permission]] = {
-    Role.ADMIN: frozenset({
-        Permission.DATA_READ, Permission.DATA_WRITE, Permission.DATA_DELETE,
-        Permission.DATA_EXPORT, Permission.CONSENT_REQUEST, Permission.CONSENT_APPROVE,
-        Permission.CONSENT_DENY, Permission.CONSENT_REVOKE,
-        Permission.NODE_REGISTER, Permission.NODE_QUARANTINE, Permission.NODE_REVOKE,
-        Permission.NODE_HEAL, Permission.CERT_ISSUE, Permission.CERT_REVOKE,
-        Permission.AUDIT_READ, Permission.AUDIT_EXPORT,
-        Permission.ADMIN_CONFIG, Permission.ADMIN_USER_MANAGE,
-    }),
-    Role.OPERATOR: frozenset({
-        Permission.DATA_READ, Permission.DATA_WRITE,
-        Permission.CONSENT_REQUEST, Permission.CONSENT_APPROVE,
-        Permission.NODE_REGISTER, Permission.NODE_HEAL,
-        Permission.CERT_ISSUE,
-        Permission.AUDIT_READ,
-    }),
-    Role.VIEWER: frozenset({
-        Permission.DATA_READ,
-        Permission.CONSENT_REQUEST,
-        Permission.AUDIT_READ,
-    }),
+DEFAULT_ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
+    Role.ADMIN: frozenset(
+        {
+            Permission.DATA_READ,
+            Permission.DATA_WRITE,
+            Permission.DATA_DELETE,
+            Permission.DATA_EXPORT,
+            Permission.CONSENT_REQUEST,
+            Permission.CONSENT_APPROVE,
+            Permission.CONSENT_DENY,
+            Permission.CONSENT_REVOKE,
+            Permission.NODE_REGISTER,
+            Permission.NODE_QUARANTINE,
+            Permission.NODE_REVOKE,
+            Permission.NODE_HEAL,
+            Permission.CERT_ISSUE,
+            Permission.CERT_REVOKE,
+            Permission.AUDIT_READ,
+            Permission.AUDIT_EXPORT,
+            Permission.ADMIN_CONFIG,
+            Permission.ADMIN_USER_MANAGE,
+        }
+    ),
+    Role.OPERATOR: frozenset(
+        {
+            Permission.DATA_READ,
+            Permission.DATA_WRITE,
+            Permission.CONSENT_REQUEST,
+            Permission.CONSENT_APPROVE,
+            Permission.NODE_REGISTER,
+            Permission.NODE_HEAL,
+            Permission.CERT_ISSUE,
+            Permission.AUDIT_READ,
+        }
+    ),
+    Role.VIEWER: frozenset(
+        {
+            Permission.DATA_READ,
+            Permission.CONSENT_REQUEST,
+            Permission.AUDIT_READ,
+        }
+    ),
     Role.DENIED: frozenset(),  # No permissions
 }
 
 # Portal-role compatibility: which roles can authenticate to which portals.
 # A DENIED role cannot authenticate to any portal.
-PORTAL_ROLE_COMPATIBILITY: Dict[Portal, FrozenSet[Role]] = {
+PORTAL_ROLE_COMPATIBILITY: dict[Portal, frozenset[Role]] = {
     Portal.PATIENT: frozenset({Role.VIEWER, Role.OPERATOR, Role.ADMIN}),
     Portal.PROVIDER: frozenset({Role.VIEWER, Role.OPERATOR, Role.ADMIN}),
     Portal.ADMIN: frozenset({Role.ADMIN}),
@@ -141,20 +163,21 @@ class Session:
     they cannot access data on the patient portal without a separate
     patient portal session.
     """
+
     session_id: str
     user_id: str
     role: Role
     portal: Portal
-    capabilities: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = None
+    capabilities: list[str] = field(default_factory=list)
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None
     mfa_verified: bool = False
 
     def is_expired(self) -> bool:
         """Check if this session has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def has_capability(self, capability: str) -> bool:
         """Check if this session includes a specific capability."""
@@ -169,9 +192,7 @@ class Session:
         """Check if this session is valid (not expired, not denied role, MFA verified if required)."""
         if self.is_expired():
             return False
-        if self.role == Role.DENIED:
-            return False
-        return True
+        return self.role != Role.DENIED
 
     def to_dict(self) -> dict:
         """Serialize session for audit logging."""
@@ -190,20 +211,21 @@ class Session:
 @dataclass
 class UserAccount:
     """A user account with credentials and lockout state."""
+
     user_id: str
     username: str
     password_hash: str  # SHA-256 hash of password
     role: Role
     totp_secret: str  # Base32-encoded TOTP secret
     failed_attempts: int = 0
-    locked_until: Optional[datetime] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    locked_until: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def is_locked(self) -> bool:
         """Check if account is currently locked."""
         if self.locked_until is None:
             return False
-        if datetime.now(timezone.utc) > self.locked_until:
+        if datetime.now(UTC) > self.locked_until:
             self.locked_until = None
             self.failed_attempts = 0
             return False
@@ -225,8 +247,8 @@ class AccessController:
     """
 
     def __init__(self):
-        self._users: Dict[str, UserAccount] = {}  # username -> UserAccount
-        self._sessions: Dict[str, Session] = {}    # session_id -> Session
+        self._users: dict[str, UserAccount] = {}  # username -> UserAccount
+        self._sessions: dict[str, Session] = {}  # session_id -> Session
 
     def create_user(self, username: str, password: str, role: Role = Role.VIEWER) -> UserAccount:
         """Create a new user account.
@@ -258,8 +280,7 @@ class AccessController:
         self._users[username] = account
         return account
 
-    def authenticate(self, username: str, password: str,
-                     portal: Portal) -> Optional[Session]:
+    def authenticate(self, username: str, password: str, portal: Portal) -> Session | None:
         """Authenticate a user and create a scoped session.
 
         Args:
@@ -296,13 +317,13 @@ class AccessController:
 
             # Progressive delay
             if account.failed_attempts <= len(PROGRESSIVE_DELAY_SECONDS):
-                delay = PROGRESSIVE_DELAY_SECONDS[account.failed_attempts - 1]
+                PROGRESSIVE_DELAY_SECONDS[account.failed_attempts - 1]
             else:
-                delay = PROGRESSIVE_DELAY_SECONDS[-1]
+                PROGRESSIVE_DELAY_SECONDS[-1]
 
             # Lockout after max failures
             if account.failed_attempts >= MAX_FAILED_ATTEMPTS:
-                account.locked_until = datetime.now(timezone.utc) + timedelta(
+                account.locked_until = datetime.now(UTC) + timedelta(
                     minutes=LOCKOUT_DURATION_MINUTES
                 )
 
@@ -323,7 +344,7 @@ class AccessController:
             role=account.role,
             portal=portal,
             capabilities=capabilities,
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=8),
+            expires_at=datetime.now(UTC) + timedelta(hours=8),
         )
         self._sessions[session.session_id] = session
         return session
@@ -407,8 +428,9 @@ class AccessController:
 
         return False
 
-    def check_permission(self, session: Session, permission: Permission,
-                         resource: str = "") -> bool:
+    def check_permission(
+        self, session: Session, permission: Permission, resource: str = ""
+    ) -> bool:
         """Check if a session has permission to perform an action.
 
         Checks:
@@ -432,18 +454,22 @@ class AccessController:
 
         # MFA required for write operations
         write_permissions = {
-            Permission.DATA_WRITE, Permission.DATA_DELETE, Permission.DATA_EXPORT,
-            Permission.CONSENT_APPROVE, Permission.CONSENT_DENY, Permission.CONSENT_REVOKE,
-            Permission.NODE_QUARANTINE, Permission.NODE_REVOKE,
-            Permission.CERT_ISSUE, Permission.CERT_REVOKE,
-            Permission.ADMIN_CONFIG, Permission.ADMIN_USER_MANAGE,
+            Permission.DATA_WRITE,
+            Permission.DATA_DELETE,
+            Permission.DATA_EXPORT,
+            Permission.CONSENT_APPROVE,
+            Permission.CONSENT_DENY,
+            Permission.CONSENT_REVOKE,
+            Permission.NODE_QUARANTINE,
+            Permission.NODE_REVOKE,
+            Permission.CERT_ISSUE,
+            Permission.CERT_REVOKE,
+            Permission.ADMIN_CONFIG,
+            Permission.ADMIN_USER_MANAGE,
         }
-        if permission in write_permissions and not session.mfa_verified:
-            return False
+        return not (permission in write_permissions and not session.mfa_verified)
 
-        return True
-
-    def get_session(self, session_id: str) -> Optional[Session]:
+    def get_session(self, session_id: str) -> Session | None:
         """Retrieve a session by ID."""
         return self._sessions.get(session_id)
 
@@ -473,7 +499,7 @@ class AccessController:
         if username not in self._users:
             raise KeyError(f"User '{username}' not found")
 
-        self._users[username].locked_until = datetime.now(timezone.utc) + timedelta(
+        self._users[username].locked_until = datetime.now(UTC) + timedelta(
             minutes=LOCKOUT_DURATION_MINUTES
         )
 
@@ -492,6 +518,6 @@ class AccessController:
         self._users[username].locked_until = None
         self._users[username].failed_attempts = 0
 
-    def get_user(self, username: str) -> Optional[UserAccount]:
+    def get_user(self, username: str) -> UserAccount | None:
         """Get a user account by username."""
         return self._users.get(username)

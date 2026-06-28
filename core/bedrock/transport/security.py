@@ -19,29 +19,31 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
 
 
 class TLSVersion(Enum):
     """Supported TLS versions."""
+
     TLS_1_2 = "1.2"
     TLS_1_3 = "1.3"
 
 
 class DowngradeStatus(Enum):
     """Result of a downgrade detection check."""
-    SECURE = "secure"           # Connection is using an acceptable TLS version
-    DOWNGRADE = "downgrade"     # Downgrade attack detected
-    UNKNOWN = "unknown"         # Cannot determine TLS version
+
+    SECURE = "secure"  # Connection is using an acceptable TLS version
+    DOWNGRADE = "downgrade"  # Downgrade attack detected
+    UNKNOWN = "unknown"  # Cannot determine TLS version
 
 
 class RateLimitResult(Enum):
     """Result of a rate limit check."""
-    ALLOWED = "allowed"         # Request is within limits
-    THROTTLED = "throttled"     # Request is rate-limited, retry after delay
-    BLOCKED = "blocked"         # Request is blocked (too many violations)
+
+    ALLOWED = "allowed"  # Request is within limits
+    THROTTLED = "throttled"  # Request is rate-limited, retry after delay
+    BLOCKED = "blocked"  # Request is blocked (too many violations)
 
 
 @dataclass
@@ -52,14 +54,15 @@ class TLSConfig:
     Developer mode allows TLS 1.2+ with self-signed certs.
     Runtime mode requires TLS 1.3+ with CA-signed certs.
     """
+
     min_version: TLSVersion = TLSVersion.TLS_1_3
     cert_path: str = ""
     key_path: str = ""
     ca_cert_path: str = ""
-    verify_client: bool = True          # Require client certificates
-    prefer_server_cipher: bool = True   # Server cipher suite preference
+    verify_client: bool = True  # Require client certificates
+    prefer_server_cipher: bool = True  # Server cipher suite preference
     session_timeout_seconds: int = 300  # 5-minute TLS session timeout
-    max_sessions_per_client: int = 10   # Max concurrent TLS sessions per client
+    max_sessions_per_client: int = 10  # Max concurrent TLS sessions per client
 
     def is_developer_mode(self) -> bool:
         """Check if this is a developer-mode TLS config."""
@@ -77,22 +80,24 @@ class RateLimitConfig:
     Uses a sliding window algorithm. Each window tracks request counts
     and resets after the window expires.
     """
-    max_requests_per_minute: int = 60       # Per node/IP
-    max_requests_per_hour: int = 3600       # Per node/IP
-    burst_size: int = 10                     # Max burst requests
-    violation_threshold: int = 5             # Violations before blocking
-    block_duration_minutes: int = 15         # How long to block after threshold
+
+    max_requests_per_minute: int = 60  # Per node/IP
+    max_requests_per_hour: int = 3600  # Per node/IP
+    burst_size: int = 10  # Max burst requests
+    violation_threshold: int = 5  # Violations before blocking
+    block_duration_minutes: int = 15  # How long to block after threshold
 
 
 @dataclass
 class ConnectionInfo:
     """Tracks a single connection's state."""
+
     connection_id: str
     node_id: str
     ip_address: str
     tls_version: TLSVersion
-    established_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_activity: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    established_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_activity: datetime = field(default_factory=lambda: datetime.now(UTC))
     bytes_sent: int = 0
     bytes_received: int = 0
     is_e2ee: bool = False  # Whether E2EE is active on this connection
@@ -106,12 +111,12 @@ class RateLimiter:
     This prevents credential stuffing, DDoS, and abuse.
     """
 
-    def __init__(self, config: Optional[RateLimitConfig] = None):
+    def __init__(self, config: RateLimitConfig | None = None):
         self.config = config or RateLimitConfig()
-        self._minute_windows: Dict[str, List[float]] = {}  # key -> [timestamps]
-        self._hour_windows: Dict[str, List[float]] = {}
-        self._violation_counts: Dict[str, int] = {}
-        self._blocked_until: Dict[str, float] = {}  # key -> unblock_timestamp
+        self._minute_windows: dict[str, list[float]] = {}  # key -> [timestamps]
+        self._hour_windows: dict[str, list[float]] = {}
+        self._violation_counts: dict[str, int] = {}
+        self._blocked_until: dict[str, float] = {}  # key -> unblock_timestamp
 
     def check(self, key: str) -> RateLimitResult:
         """Check if a request from key (node_id or IP) is allowed.
@@ -140,7 +145,10 @@ class RateLimiter:
         hour_count = len(self._hour_windows.get(key, []))
 
         # Check burst
-        if minute_count >= self.config.burst_size and minute_count <= self.config.max_requests_per_minute:
+        if (
+            minute_count >= self.config.burst_size
+            and minute_count <= self.config.max_requests_per_minute
+        ):
             # Over burst but under rate limit — throttle
             self._record_request(key, now)
             return RateLimitResult.THROTTLED
@@ -181,8 +189,9 @@ class RateLimiter:
 
         return RateLimitResult.THROTTLED
 
-    def _clean_window(self, windows: Dict[str, List[float]], key: str,
-                      now: float, window_seconds: int) -> None:
+    def _clean_window(
+        self, windows: dict[str, list[float]], key: str, now: float, window_seconds: int
+    ) -> None:
         """Remove timestamps outside the sliding window."""
         if key in windows:
             cutoff = now - window_seconds
@@ -225,17 +234,22 @@ class TransportLayer:
     every downgrade attempt is rejected and logged.
     """
 
-    def __init__(self, tls_config: Optional[TLSConfig] = None,
-                 rate_limit_config: Optional[RateLimitConfig] = None):
+    def __init__(
+        self, tls_config: TLSConfig | None = None, rate_limit_config: RateLimitConfig | None = None
+    ):
         self.tls_config = tls_config or TLSConfig()
         self.rate_limiter = RateLimiter(rate_limit_config or RateLimitConfig())
-        self._connections: Dict[str, ConnectionInfo] = {}
+        self._connections: dict[str, ConnectionInfo] = {}
         self._max_connections: int = 1000  # Per transport instance
 
-    def configure_tls(self, cert_path: str, key_path: str,
-                      ca_cert_path: str = "",
-                      min_version: TLSVersion = TLSVersion.TLS_1_3,
-                      verify_client: bool = True) -> TLSConfig:
+    def configure_tls(
+        self,
+        cert_path: str,
+        key_path: str,
+        ca_cert_path: str = "",
+        min_version: TLSVersion = TLSVersion.TLS_1_3,
+        verify_client: bool = True,
+    ) -> TLSConfig:
         """Configure TLS termination with minimum version enforcement.
 
         Args:
@@ -305,10 +319,14 @@ class TransportLayer:
 
         return DowngradeStatus.SECURE
 
-    def register_connection(self, connection_id: str, node_id: str,
-                            ip_address: str,
-                            tls_version: TLSVersion = TLSVersion.TLS_1_3,
-                            is_e2ee: bool = False) -> ConnectionInfo:
+    def register_connection(
+        self,
+        connection_id: str,
+        node_id: str,
+        ip_address: str,
+        tls_version: TLSVersion = TLSVersion.TLS_1_3,
+        is_e2ee: bool = False,
+    ) -> ConnectionInfo:
         """Register a new connection.
 
         Args:
@@ -337,7 +355,7 @@ class TransportLayer:
         self._connections[connection_id] = conn
         return conn
 
-    def close_connection(self, connection_id: str) -> Optional[ConnectionInfo]:
+    def close_connection(self, connection_id: str) -> ConnectionInfo | None:
         """Close and remove a connection.
 
         Returns:
@@ -345,11 +363,11 @@ class TransportLayer:
         """
         return self._connections.pop(connection_id, None)
 
-    def get_connection(self, connection_id: str) -> Optional[ConnectionInfo]:
+    def get_connection(self, connection_id: str) -> ConnectionInfo | None:
         """Get connection info by ID."""
         return self._connections.get(connection_id)
 
-    def get_active_connections(self, node_id: Optional[str] = None) -> List[ConnectionInfo]:
+    def get_active_connections(self, node_id: str | None = None) -> list[ConnectionInfo]:
         """Get active connections, optionally filtered by node_id.
 
         Args:
@@ -374,9 +392,9 @@ class TransportLayer:
         """
         return self.rate_limiter.check(key)
 
-    def update_activity(self, connection_id: str,
-                        bytes_sent: int = 0,
-                        bytes_received: int = 0) -> Optional[ConnectionInfo]:
+    def update_activity(
+        self, connection_id: str, bytes_sent: int = 0, bytes_received: int = 0
+    ) -> ConnectionInfo | None:
         """Update connection activity metrics.
 
         Args:
@@ -391,7 +409,7 @@ class TransportLayer:
         if conn is None:
             return None
 
-        conn.last_activity = datetime.now(timezone.utc)
+        conn.last_activity = datetime.now(UTC)
         conn.bytes_sent += bytes_sent
         conn.bytes_received += bytes_received
         return conn

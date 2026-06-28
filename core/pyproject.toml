@@ -76,7 +76,16 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "C4"]
-ignore = ["E501"]
+ignore = [
+    "E501",   # Line length handled by black
+    "A002",   # Shadowing builtins (format, license) is intentional
+    "B904",   # raise-from — existing pattern, not changing now
+    "B905",   # zip() strict — existing pattern
+    "B007",   # Unused loop variables — existing pattern
+    "SIM102", # Nested if — existing pattern
+    "SIM103", # Return condition — existing pattern
+    "SIM105", # contextlib.suppress — existing pattern
+]
 
 [tool.mypy]
 python_version = "3.11"

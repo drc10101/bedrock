@@ -12,21 +12,27 @@ flags trigger quarantine. No single node can unilaterally isolate another.
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from datetime import UTC, datetime
 
 from bedrock.identity.node import Node, NodeState
 
 
 class TransitionRecord:
     """Records a state transition for audit purposes."""
-    def __init__(self, node_id: str, from_state: NodeState, to_state: NodeState,
-                 reason: str, timestamp: Optional[datetime] = None):
+
+    def __init__(
+        self,
+        node_id: str,
+        from_state: NodeState,
+        to_state: NodeState,
+        reason: str,
+        timestamp: datetime | None = None,
+    ):
         self.node_id = node_id
         self.from_state = from_state
         self.to_state = to_state
         self.reason = reason
-        self.timestamp = timestamp or datetime.now(timezone.utc)
+        self.timestamp = timestamp or datetime.now(UTC)
 
 
 class MeshStateMachine:
@@ -55,10 +61,9 @@ class MeshStateMachine:
     }
 
     def __init__(self):
-        self._transition_history: List[TransitionRecord] = []
+        self._transition_history: list[TransitionRecord] = []
 
-    def transition(self, node: Node, new_state: NodeState,
-                   reason: str = "") -> Node:
+    def transition(self, node: Node, new_state: NodeState, reason: str = "") -> Node:
         """Transition a node to a new state.
 
         Validates the transition is legal. Records it in history.
@@ -98,8 +103,7 @@ class MeshStateMachine:
         allowed = self.VALID_TRANSITIONS.get(node.state, [])
         return new_state in allowed
 
-    def can_promote_to_active(self, node: Node,
-                               healing_period_seconds: int = 3600) -> bool:
+    def can_promote_to_active(self, node: Node, healing_period_seconds: int = 3600) -> bool:
         """Check if a healing node can be promoted to active.
 
         Conditions:
@@ -113,8 +117,7 @@ class MeshStateMachine:
         # Find when this node entered HEALING state
         healing_start = None
         for record in reversed(self._transition_history):
-            if (record.node_id == node.node_id and
-                    record.to_state == NodeState.HEALING):
+            if record.node_id == node.node_id and record.to_state == NodeState.HEALING:
                 healing_start = record.timestamp
                 break
 
@@ -122,26 +125,28 @@ class MeshStateMachine:
             return True  # No record found, allow promotion
 
         # Check if healing period has elapsed
-        elapsed = (datetime.now(timezone.utc) - healing_start).total_seconds()
+        elapsed = (datetime.now(UTC) - healing_start).total_seconds()
         if elapsed < healing_period_seconds:
             return False
 
         # Check for new flags during healing
         for record in self._transition_history:
-            if (record.node_id == node.node_id and
-                    record.to_state == NodeState.QUARANTINED and
-                    record.timestamp > healing_start):
+            if (
+                record.node_id == node.node_id
+                and record.to_state == NodeState.QUARANTINED
+                and record.timestamp > healing_start
+            ):
                 return False
 
         return True
 
-    def get_transition_history(self, node_id: Optional[str] = None) -> List[TransitionRecord]:
+    def get_transition_history(self, node_id: str | None = None) -> list[TransitionRecord]:
         """Get transition history, optionally filtered by node_id."""
         if node_id:
             return [r for r in self._transition_history if r.node_id == node_id]
         return list(self._transition_history)
 
-    def get_last_transition(self, node_id: str) -> Optional[TransitionRecord]:
+    def get_last_transition(self, node_id: str) -> TransitionRecord | None:
         """Get the most recent transition for a node."""
         for record in reversed(self._transition_history):
             if record.node_id == node_id:

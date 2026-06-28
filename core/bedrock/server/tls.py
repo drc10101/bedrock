@@ -11,9 +11,7 @@ import os
 import ssl
 import subprocess
 import tempfile
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 
 class TLSConfig:
@@ -130,8 +128,8 @@ def generate_self_signed_cert(
     key_file: str,
     common_name: str = "bedrock-dev",
     days: int = 365,
-    san_dns: Optional[list] = None,
-    san_ip: Optional[list] = None,
+    san_dns: list | None = None,
+    san_ip: list | None = None,
 ) -> dict:
     """Generate a self-signed TLS certificate for development.
 
@@ -155,13 +153,22 @@ def generate_self_signed_cert(
     # Generate private key
     subprocess.run(
         [
-            "openssl", "req", "-x509", "-newkey", "rsa:2048",
-            "-keyout", key_file,
-            "-out", cert_file,
-            "-days", str(days),
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-keyout",
+            key_file,
+            "-out",
+            cert_file,
+            "-days",
+            str(days),
             "-nodes",
-            "-subj", f"/CN={common_name}/O=Bedrock-Dev/C=US",
-            "-addext", f"subjectAltName={san_string}",
+            "-subj",
+            f"/CN={common_name}/O=Bedrock-Dev/C=US",
+            "-addext",
+            f"subjectAltName={san_string}",
         ],
         check=True,
         capture_output=True,
@@ -194,9 +201,9 @@ def generate_self_signed_cert_python(
     """
     try:
         from cryptography import x509
-        from cryptography.x509.oid import NameOID
         from cryptography.hazmat.primitives import hashes, serialization
         from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
     except ImportError:
         raise ImportError(
             "cryptography package required for self-signed cert generation. "
@@ -207,14 +214,16 @@ def generate_self_signed_cert_python(
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     # Build subject
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Bedrock-Dev"),
-        x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Bedrock-Dev"),
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+        ]
+    )
 
     # Build certificate
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -224,12 +233,14 @@ def generate_self_signed_cert_python(
         .not_valid_before(now)
         .not_valid_after(now + timedelta(days=days))
         .add_extension(
-            x509.SubjectAlternativeName([
-                x509.DNSName("localhost"),
-                x509.DNSName(common_name),
-                x509.IPAddress(__import__("ipaddress").IPv4Address("127.0.0.1")),
-                x509.IPAddress(__import__("ipaddress").IPv6Address("::1")),
-            ]),
+            x509.SubjectAlternativeName(
+                [
+                    x509.DNSName("localhost"),
+                    x509.DNSName(common_name),
+                    x509.IPAddress(__import__("ipaddress").IPv4Address("127.0.0.1")),
+                    x509.IPAddress(__import__("ipaddress").IPv6Address("::1")),
+                ]
+            ),
             critical=False,
         )
         .add_extension(
@@ -329,7 +340,9 @@ def validate_cert_pair(cert_file: str, key_file: str) -> dict:
     try:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_file, "-noout", "-subject", "-dates", "-issuer"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         )
         for line in result.stdout.strip().split("\n"):
             if "=" in line:

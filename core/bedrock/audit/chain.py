@@ -20,10 +20,9 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Sequence
 
 
 class AuditAction(Enum):
@@ -32,6 +31,7 @@ class AuditAction(Enum):
     Each action follows the format: category.operation
     e.g., node.register, field.encrypt, consent.approve
     """
+
     # Node lifecycle
     NODE_REGISTER = "node.register"
     NODE_ATTEST = "node.attest"
@@ -92,15 +92,16 @@ class AuditEntry:
     subsequent hashes. This provides cryptographic proof of audit log
     integrity without requiring a central authority.
     """
+
     timestamp: datetime
-    action: str          # e.g., "node.register", "field.encrypt", "consent.approve"
-    actor_id: str        # Node ID or user ID that performed the action
-    target_id: str       # What was acted upon (record ID, node ID, etc.)
-    silo: str            # Which silo this action relates to
+    action: str  # e.g., "node.register", "field.encrypt", "consent.approve"
+    actor_id: str  # Node ID or user ID that performed the action
+    target_id: str  # What was acted upon (record ID, node ID, etc.)
+    silo: str  # Which silo this action relates to
     details: dict = field(default_factory=dict)  # Arbitrary key-value details
     prev_hash: str = ""  # SHA-256 hash of the previous entry
-    entry_hash: str = "" # SHA-256 hash of this entry (computed on append)
-    entry_index: int = 0 # Position in the chain (0-indexed)
+    entry_hash: str = ""  # SHA-256 hash of this entry (computed on append)
+    entry_index: int = 0  # Position in the chain (0-indexed)
 
     def compute_hash(self) -> str:
         """Compute the SHA-256 hash for this entry.
@@ -163,11 +164,12 @@ class AuditChain:
     """
 
     def __init__(self):
-        self._chain: List[AuditEntry] = []
+        self._chain: list[AuditEntry] = []
         self._last_hash: str = GENESIS_HASH
 
-    def append(self, action: str, actor_id: str, target_id: str,
-               silo: str, details: Optional[dict] = None) -> AuditEntry:
+    def append(
+        self, action: str, actor_id: str, target_id: str, silo: str, details: dict | None = None
+    ) -> AuditEntry:
         """Append a new entry to the audit chain.
 
         The entry's hash is computed from the previous entry's hash +
@@ -184,7 +186,7 @@ class AuditChain:
             The appended AuditEntry with computed hash
         """
         entry = AuditEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             action=action,
             actor_id=actor_id,
             target_id=target_id,
@@ -221,9 +223,8 @@ class AuditChain:
                 return False
 
             # Verify chain link
-            if i > 0:
-                if entry.prev_hash != self._chain[i - 1].entry_hash:
-                    return False
+            if i > 0 and entry.prev_hash != self._chain[i - 1].entry_hash:
+                return False
 
         return True
 
@@ -257,34 +258,37 @@ class AuditChain:
 
         return True
 
-    def get(self, index: int) -> Optional[AuditEntry]:
+    def get(self, index: int) -> AuditEntry | None:
         """Get an entry by its index in the chain."""
         if 0 <= index < len(self._chain):
             return self._chain[index]
         return None
 
-    def get_by_action(self, action: str, limit: int = 100) -> List[AuditEntry]:
+    def get_by_action(self, action: str, limit: int = 100) -> list[AuditEntry]:
         """Get entries filtered by action type."""
         entries = [e for e in self._chain if e.action == action]
         return entries[-limit:]
 
-    def get_by_actor(self, actor_id: str, limit: int = 100) -> List[AuditEntry]:
+    def get_by_actor(self, actor_id: str, limit: int = 100) -> list[AuditEntry]:
         """Get entries filtered by actor."""
         entries = [e for e in self._chain if e.actor_id == actor_id]
         return entries[-limit:]
 
-    def get_by_silo(self, silo: str, limit: int = 100) -> List[AuditEntry]:
+    def get_by_silo(self, silo: str, limit: int = 100) -> list[AuditEntry]:
         """Get entries filtered by silo."""
         entries = [e for e in self._chain if e.silo == silo]
         return entries[-limit:]
 
-    def query(self, action: Optional[str] = None,
-              actor_id: Optional[str] = None,
-              target_id: Optional[str] = None,
-              silo: Optional[str] = None,
-              start_time: Optional[datetime] = None,
-              end_time: Optional[datetime] = None,
-              limit: int = 100) -> List[AuditEntry]:
+    def query(
+        self,
+        action: str | None = None,
+        actor_id: str | None = None,
+        target_id: str | None = None,
+        silo: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        limit: int = 100,
+    ) -> list[AuditEntry]:
         """Query the audit chain with multiple filters.
 
         All filters are optional. Only entries matching all provided
@@ -319,9 +323,12 @@ class AuditChain:
 
         return results[-limit:]
 
-    def export(self, start_date: Optional[datetime] = None,
-               end_date: Optional[datetime] = None,
-               format: str = "jsonl") -> str:
+    def export(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        format: str = "jsonl",
+    ) -> str:
         """Export audit chain entries for compliance reporting.
 
         Supports HIPAA, SOC 2, PCI-DSS audit requirements.

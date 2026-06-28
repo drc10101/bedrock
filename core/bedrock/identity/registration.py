@@ -11,14 +11,9 @@ valid state transitions.
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
-import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set
-
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from bedrock.identity.node import Node, NodeID, NodeState
-
 
 # Valid state transitions in the Self-Healing Mesh
 VALID_TRANSITIONS = {
@@ -32,11 +27,13 @@ VALID_TRANSITIONS = {
 
 class RegistrationError(Exception):
     """Raised when node registration fails."""
+
     pass
 
 
 class StateTransitionError(Exception):
     """Raised when an invalid state transition is attempted."""
+
     pass
 
 
@@ -54,13 +51,17 @@ class NodeRegistry:
     """
 
     def __init__(self):
-        self._nodes: Dict[str, Node] = {}  # uuid -> Node
-        self._public_keys: Dict[bytes, str] = {}  # public_key -> uuid (enforce uniqueness)
-        self._names: Dict[str, str] = {}  # name -> uuid (enforce uniqueness)
+        self._nodes: dict[str, Node] = {}  # uuid -> Node
+        self._public_keys: dict[bytes, str] = {}  # public_key -> uuid (enforce uniqueness)
+        self._names: dict[str, str] = {}  # name -> uuid (enforce uniqueness)
 
-    def register(self, name: str, node_type: str = "server",
-                 private_key: Optional[Ed25519PrivateKey] = None,
-                 metadata: Optional[dict] = None) -> Node:
+    def register(
+        self,
+        name: str,
+        node_type: str = "server",
+        private_key: Ed25519PrivateKey | None = None,
+        metadata: dict | None = None,
+    ) -> Node:
         """Register a new node in the network.
 
         Generates a new cryptographic identity (UUID v7 + ed25519 key pair)
@@ -104,14 +105,14 @@ class NodeRegistry:
 
         return node
 
-    def get(self, uuid: str) -> Optional[Node]:
+    def get(self, uuid: str) -> Node | None:
         """Look up a node by its UUID.
 
         Returns None if not found.
         """
         return self._nodes.get(uuid)
 
-    def get_by_name(self, name: str) -> Optional[Node]:
+    def get_by_name(self, name: str) -> Node | None:
         """Look up a node by its human-readable name.
 
         Returns None if not found.
@@ -121,7 +122,7 @@ class NodeRegistry:
             return None
         return self._nodes.get(uuid)
 
-    def get_by_public_key(self, public_key: bytes) -> Optional[Node]:
+    def get_by_public_key(self, public_key: bytes) -> Node | None:
         """Look up a node by its ed25519 public key.
 
         Returns None if not found.
@@ -131,8 +132,9 @@ class NodeRegistry:
             return None
         return self._nodes.get(uuid)
 
-    def list_nodes(self, state: Optional[NodeState] = None,
-                   node_type: Optional[str] = None) -> List[Node]:
+    def list_nodes(
+        self, state: NodeState | None = None, node_type: str | None = None
+    ) -> list[Node]:
         """List nodes, optionally filtered by state or type.
 
         Args:
@@ -149,7 +151,7 @@ class NodeRegistry:
             nodes = [n for n in nodes if n.node_type == node_type]
         return nodes
 
-    def count(self, state: Optional[NodeState] = None) -> int:
+    def count(self, state: NodeState | None = None) -> int:
         """Count nodes, optionally filtered by state."""
         if state is None:
             return len(self._nodes)
@@ -241,22 +243,22 @@ class NodeRegistry:
         node.update_heartbeat()
         return node
 
-    def get_active_nodes(self) -> List[Node]:
+    def get_active_nodes(self) -> list[Node]:
         """Get all nodes in ACTIVE state."""
         return self.list_nodes(state=NodeState.ACTIVE)
 
-    def get_suspect_nodes(self) -> List[Node]:
+    def get_suspect_nodes(self) -> list[Node]:
         """Get all nodes in SUSPECT state."""
         return self.list_nodes(state=NodeState.SUSPECT)
 
-    def get_quarantined_nodes(self) -> List[Node]:
+    def get_quarantined_nodes(self) -> list[Node]:
         """Get all nodes in QUARANTINED state."""
         return self.list_nodes(state=NodeState.QUARANTINED)
 
-    def get_healing_nodes(self) -> List[Node]:
+    def get_healing_nodes(self) -> list[Node]:
         """Get all nodes in HEALING state."""
         return self.list_nodes(state=NodeState.HEALING)
 
-    def get_revoked_nodes(self) -> List[Node]:
+    def get_revoked_nodes(self) -> list[Node]:
         """Get all nodes in REVOKED state."""
         return self.list_nodes(state=NodeState.REVOKED)

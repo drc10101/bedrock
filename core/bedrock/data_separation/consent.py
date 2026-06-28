@@ -16,14 +16,12 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
-
-from bedrock.data_separation.anonymous_id import AnonymousID
+from datetime import UTC, datetime, timedelta
 
 
 class ConsentStatus:
     """Consent event statuses."""
+
     PENDING = "pending"
     APPROVED = "approved"
     DENIED = "denied"
@@ -41,19 +39,20 @@ class ConsentEvent:
     personal info request (PIR) separately. In Bedrock, this generalizes to
     any data owner approving any scoped data access.
     """
+
     consent_id: str
-    data_owner_id: str          # Anonymous ID of the data owner
-    requesting_node_id: str     # Node requesting access
-    source_silo: str            # Silo being requested
-    target_silo: str            # Silo requesting the data
-    categories: List[str]       # Specific data categories approved
-    scope: str                  # "read", "write", "consent"
+    data_owner_id: str  # Anonymous ID of the data owner
+    requesting_node_id: str  # Node requesting access
+    source_silo: str  # Silo being requested
+    target_silo: str  # Silo requesting the data
+    categories: list[str]  # Specific data categories approved
+    scope: str  # "read", "write", "consent"
     status: str = ConsentStatus.PENDING
     reason: str = ""
-    approved_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    revoked_at: Optional[datetime] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    approved_at: datetime | None = None
+    expires_at: datetime | None = None
+    revoked_at: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def is_valid(self) -> bool:
         """Check if this consent event is currently valid.
@@ -62,9 +61,7 @@ class ConsentEvent:
         """
         if self.status != ConsentStatus.APPROVED:
             return False
-        if self.expires_at and datetime.now(timezone.utc) > self.expires_at:
-            return False
-        return True
+        return not (self.expires_at and datetime.now(UTC) > self.expires_at)
 
     def has_category(self, category: str) -> bool:
         """Check if this consent covers a specific category."""
@@ -78,9 +75,7 @@ class ConsentEvent:
         """
         if self.scope == requested_scope:
             return True
-        if self.scope == "write" and requested_scope == "read":
-            return True
-        return False
+        return bool(self.scope == "write" and requested_scope == "read")
 
 
 class ConsentGate:
@@ -98,11 +93,17 @@ class ConsentGate:
     """
 
     def __init__(self):
-        self._events: Dict[str, ConsentEvent] = {}
+        self._events: dict[str, ConsentEvent] = {}
 
-    def request_consent(self, requesting_node_id: str, source_silo: str,
-                        target_silo: str, categories: List[str],
-                        scope: str = "read", reason: str = "") -> ConsentEvent:
+    def request_consent(
+        self,
+        requesting_node_id: str,
+        source_silo: str,
+        target_silo: str,
+        categories: list[str],
+        scope: str = "read",
+        reason: str = "",
+    ) -> ConsentEvent:
         """Request consent for cross-silo data access.
 
         Args:
@@ -130,8 +131,9 @@ class ConsentGate:
         self._events[consent_id] = event
         return event
 
-    def approve_consent(self, consent_id: str, data_owner_id: str,
-                        ttl_seconds: int = 3600) -> ConsentEvent:
+    def approve_consent(
+        self, consent_id: str, data_owner_id: str, ttl_seconds: int = 3600
+    ) -> ConsentEvent:
         """Data owner approves a consent request with a time limit.
 
         Args:
@@ -157,12 +159,11 @@ class ConsentGate:
 
         event.status = ConsentStatus.APPROVED
         event.data_owner_id = data_owner_id
-        event.approved_at = datetime.now(timezone.utc)
-        event.expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+        event.approved_at = datetime.now(UTC)
+        event.expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
         return event
 
-    def deny_consent(self, consent_id: str, data_owner_id: str,
-                     reason: str = "") -> ConsentEvent:
+    def deny_consent(self, consent_id: str, data_owner_id: str, reason: str = "") -> ConsentEvent:
         """Data owner denies a consent request.
 
         Args:
@@ -219,10 +220,10 @@ class ConsentGate:
             )
 
         event.status = ConsentStatus.REVOKED
-        event.revoked_at = datetime.now(timezone.utc)
+        event.revoked_at = datetime.now(UTC)
         return event
 
-    def check_consent(self, consent_id: str) -> Optional[ConsentEvent]:
+    def check_consent(self, consent_id: str) -> ConsentEvent | None:
         """Check if a consent event is valid (approved and not expired).
 
         Returns the ConsentEvent if valid, None otherwise.
@@ -234,7 +235,7 @@ class ConsentGate:
 
         # Auto-transition expired events
         if event.status == ConsentStatus.APPROVED and event.expires_at:
-            if datetime.now(timezone.utc) > event.expires_at:
+            if datetime.now(UTC) > event.expires_at:
                 event.status = ConsentStatus.EXPIRED
                 return None
 
@@ -242,26 +243,26 @@ class ConsentGate:
             return event
         return None
 
-    def get_pending(self) -> List[ConsentEvent]:
+    def get_pending(self) -> list[ConsentEvent]:
         """Get all pending consent requests."""
-        return [e for e in self._events.values()
-                if e.status == ConsentStatus.PENDING]
+        return [e for e in self._events.values() if e.status == ConsentStatus.PENDING]
 
-    def get_approved(self) -> List[ConsentEvent]:
+    def get_approved(self) -> list[ConsentEvent]:
         """Get all currently valid (approved, not expired) consent events."""
         return [e for e in self._events.values() if e.is_valid()]
 
-    def get_for_owner(self, data_owner_id: str) -> List[ConsentEvent]:
+    def get_for_owner(self, data_owner_id: str) -> list[ConsentEvent]:
         """Get all consent events for a specific data owner."""
-        return [e for e in self._events.values()
-                if e.data_owner_id == data_owner_id]
+        return [e for e in self._events.values() if e.data_owner_id == data_owner_id]
 
-    def get_for_node(self, requesting_node_id: str) -> List[ConsentEvent]:
+    def get_for_node(self, requesting_node_id: str) -> list[ConsentEvent]:
         """Get all consent events from a specific requesting node."""
-        return [e for e in self._events.values()
-                if e.requesting_node_id == requesting_node_id]
+        return [e for e in self._events.values() if e.requesting_node_id == requesting_node_id]
 
-    def get_for_silo_pair(self, source_silo: str, target_silo: str) -> List[ConsentEvent]:
+    def get_for_silo_pair(self, source_silo: str, target_silo: str) -> list[ConsentEvent]:
         """Get all consent events between two silos."""
-        return [e for e in self._events.values()
-                if e.source_silo == source_silo and e.target_silo == target_silo]
+        return [
+            e
+            for e in self._events.values()
+            if e.source_silo == source_silo and e.target_silo == target_silo
+        ]

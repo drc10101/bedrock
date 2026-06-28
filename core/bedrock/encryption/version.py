@@ -13,6 +13,7 @@ class CiphertextFormat(Enum):
     v1: Legacy Fernet format (backward compatibility with InFill)
     v2: Current AES-256-GCM with HKDF-derived keys and AAD binding
     """
+
     V1_FERNET = "v1:"
     V2_GCM = "v2:"
 

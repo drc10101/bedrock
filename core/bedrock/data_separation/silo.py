@@ -14,8 +14,7 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Set
+from datetime import UTC, datetime
 
 
 @dataclass
@@ -30,14 +29,15 @@ class Silo:
     - Banking: Identity silo, Transaction silo, Auth silo
     - Defense: Identity silo, Intelligence silo, Auth silo
     """
-    name: str                    # e.g., "medical", "identity", "transaction"
-    display_name: str            # e.g., "Medical Records", "Personal Information"
-    hkdf_info: str               # e.g., "bedrock:silo:medical:v1"
-    encrypted: bool = True       # All silos encrypted by default
-    categories: List[str] = field(default_factory=list)  # Data categories in this silo
+
+    name: str  # e.g., "medical", "identity", "transaction"
+    display_name: str  # e.g., "Medical Records", "Personal Information"
+    hkdf_info: str  # e.g., "bedrock:silo:medical:v1"
+    encrypted: bool = True  # All silos encrypted by default
+    categories: list[str] = field(default_factory=list)  # Data categories in this silo
     description: str = ""
-    key_version: int = 1        # Current key version for this silo
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    key_version: int = 1  # Current key version for this silo
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def derive_key_info(self) -> str:
         """Return the HKDF info string for this silo's key derivation."""
@@ -62,13 +62,17 @@ class SiloManager:
     """
 
     def __init__(self):
-        self._silos: Dict[str, Silo] = {}
+        self._silos: dict[str, Silo] = {}
 
-    def create_silo(self, name: str, display_name: str,
-                    categories: Optional[List[str]] = None,
-                    description: str = "",
-                    encrypted: bool = True,
-                    hkdf_info: Optional[str] = None) -> Silo:
+    def create_silo(
+        self,
+        name: str,
+        display_name: str,
+        categories: list[str] | None = None,
+        description: str = "",
+        encrypted: bool = True,
+        hkdf_info: str | None = None,
+    ) -> Silo:
         """Create a new data silo.
 
         Args:
@@ -100,17 +104,21 @@ class SiloManager:
         self._silos[name] = silo
         return silo
 
-    def get_silo(self, name: str) -> Optional[Silo]:
+    def get_silo(self, name: str) -> Silo | None:
         """Get a silo by name. Returns None if not found."""
         return self._silos.get(name)
 
-    def list_silos(self) -> List[Silo]:
+    def list_silos(self) -> list[Silo]:
         """List all silos."""
         return list(self._silos.values())
 
-    def update_silo(self, name: str, display_name: Optional[str] = None,
-                    categories: Optional[List[str]] = None,
-                    description: Optional[str] = None) -> Silo:
+    def update_silo(
+        self,
+        name: str,
+        display_name: str | None = None,
+        categories: list[str] | None = None,
+        description: str | None = None,
+    ) -> Silo:
         """Update a silo's metadata.
 
         Args:
@@ -155,6 +163,6 @@ class SiloManager:
         """Check if a silo exists."""
         return name in self._silos
 
-    def get_silos_for_category(self, category: str) -> List[Silo]:
+    def get_silos_for_category(self, category: str) -> list[Silo]:
         """Find all silos that contain a given data category."""
         return [s for s in self._silos.values() if s.has_category(category)]

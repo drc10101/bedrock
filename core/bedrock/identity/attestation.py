@@ -19,18 +19,17 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
 import hashlib
-import hmac
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional, Set
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 class AttestationStatus(Enum):
     """Result of an attestation verification."""
+
     PASSED = "passed"
     FAILED = "failed"
     PENDING = "pending"
@@ -44,6 +43,7 @@ class AttestationPolicy(Enum):
     MODERATE: First mismatch → SUSPECT, second → QUARANTINED.
     PERMISSIVE: Log mismatches, no automatic state change.
     """
+
     STRICT = "strict"
     MODERATE = "moderate"
     PERMISSIVE = "permissive"
@@ -56,11 +56,12 @@ class AttestationClaim:
     The claim is signed by the node's ed25519 private key, proving it came
     from the node (not spoofed by an attacker).
     """
+
     node_uuid: str
     state_hash: str  # SHA-256 of node's software state
-    components: List[str]  # What was hashed: ["firmware", "os", "config", ...]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    signature: Optional[bytes] = None  # ed25519 signature over (uuid + state_hash + timestamp)
+    components: list[str]  # What was hashed: ["firmware", "os", "config", ...]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    signature: bytes | None = None  # ed25519 signature over (uuid + state_hash + timestamp)
 
     def sign(self, private_key: Ed25519PrivateKey) -> None:
         """Sign the claim with the node's ed25519 private key.
@@ -83,6 +84,7 @@ class AttestationClaim:
         if self.signature is None:
             return False
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
         try:
             pk = Ed25519PublicKey.from_public_bytes(public_key)
             pk.verify(self.signature, self._signing_message())
@@ -95,19 +97,18 @@ class AttestationClaim:
 
         Covers: node_uuid + state_hash + ISO timestamp.
         """
-        return (
-            f"{self.node_uuid}:{self.state_hash}:{self.timestamp.isoformat()}"
-        ).encode("utf-8")
+        return (f"{self.node_uuid}:{self.state_hash}:{self.timestamp.isoformat()}").encode()
 
 
 @dataclass
 class AttestationResult:
     """The outcome of an attestation verification."""
+
     claim: AttestationClaim
     status: AttestationStatus
-    baseline_hash: Optional[str] = None  # The registered baseline, if found
+    baseline_hash: str | None = None  # The registered baseline, if found
     reason: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -117,11 +118,14 @@ class BaselineEntry:
     Baselines can be versioned — a new firmware version gets a new baseline.
     Old baselines are kept for rollback comparison but marked as superseded.
     """
+
     node_type: str  # e.g., "warehouse-sensor", "api-server"
-    version: str    # e.g., "v2.1.0"
+    version: str  # e.g., "v2.1.0"
     baseline_hash: str  # SHA-256 of known-good state
-    components: List[str] = field(default_factory=lambda: ["firmware", "os", "config"])  # What was hashed
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    components: list[str] = field(
+        default_factory=lambda: ["firmware", "os", "config"]
+    )  # What was hashed
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     registered_by: str = ""  # Admin who registered
     superseded: bool = False  # True if a newer baseline exists
 
@@ -141,18 +145,24 @@ class AttestationManager:
     Self-Healing Mesh handles quarantine.
     """
 
-    def __init__(self, policy: AttestationPolicy = AttestationPolicy.STRICT,
-                 max_claim_age_seconds: int = 300):
-        self._baselines: Dict[str, BaselineEntry] = {}  # node_type -> BaselineEntry
-        self._results: List[AttestationResult] = []  # Audit trail
-        self._failure_counts: Dict[str, int] = {}  # node_uuid -> consecutive failures
-        self._public_keys: Dict[str, bytes] = {}  # node_uuid -> ed25519 public key
+    def __init__(
+        self, policy: AttestationPolicy = AttestationPolicy.STRICT, max_claim_age_seconds: int = 300
+    ):
+        self._baselines: dict[str, BaselineEntry] = {}  # node_type -> BaselineEntry
+        self._results: list[AttestationResult] = []  # Audit trail
+        self._failure_counts: dict[str, int] = {}  # node_uuid -> consecutive failures
+        self._public_keys: dict[str, bytes] = {}  # node_uuid -> ed25519 public key
         self.policy = policy
         self.max_claim_age_seconds = max_claim_age_seconds
 
-    def register_baseline(self, node_type: str, version: str,
-                          baseline_hash: str, components: Optional[List[str]] = None,
-                          registered_by: str = "admin") -> BaselineEntry:
+    def register_baseline(
+        self,
+        node_type: str,
+        version: str,
+        baseline_hash: str,
+        components: list[str] | None = None,
+        registered_by: str = "admin",
+    ) -> BaselineEntry:
         """Register a known-good software state hash for a node type.
 
         If a baseline already exists for this node_type+version, it's updated.
@@ -173,7 +183,7 @@ class AttestationManager:
             components = ["firmware", "os", "config"]
 
         # Mark existing baselines for this node_type as superseded
-        for key, entry in self._baselines.items():
+        for _key, entry in self._baselines.items():
             if entry.node_type == node_type and not entry.superseded:
                 entry.superseded = True
 
@@ -195,8 +205,9 @@ class AttestationManager:
         """
         self._public_keys[node_uuid] = public_key
 
-    def verify_attestation(self, claim: AttestationClaim,
-                           node_type: Optional[str] = None) -> AttestationResult:
+    def verify_attestation(
+        self, claim: AttestationClaim, node_type: str | None = None
+    ) -> AttestationResult:
         """Verify a node's attestation claim against its registered baseline.
 
         Verification checks:
@@ -234,7 +245,7 @@ class AttestationManager:
             return result
 
         # Check 2: Verify freshness (replay protection)
-        age = (datetime.now(timezone.utc) - claim.timestamp).total_seconds()
+        age = (datetime.now(UTC) - claim.timestamp).total_seconds()
         if age > self.max_claim_age_seconds:
             result = AttestationResult(
                 claim=claim,
@@ -262,7 +273,7 @@ class AttestationManager:
                 status=AttestationStatus.FAILED,
                 baseline_hash=baseline.baseline_hash,
                 reason=f"State hash mismatch: expected {baseline.baseline_hash[:16]}..., "
-                       f"got {claim.state_hash[:16]}...",
+                f"got {claim.state_hash[:16]}...",
             )
             self._results.append(result)
             self._record_failure(claim.node_uuid)
@@ -304,12 +315,13 @@ class AttestationManager:
         """Get the number of consecutive attestation failures for a node."""
         return self._failure_counts.get(node_uuid, 0)
 
-    def get_baseline(self, node_type: str) -> Optional[BaselineEntry]:
+    def get_baseline(self, node_type: str) -> BaselineEntry | None:
         """Get the current baseline for a node type."""
         return self._baselines.get(node_type)
 
-    def get_attestation_history(self, node_uuid: Optional[str] = None,
-                                limit: int = 100) -> List[AttestationResult]:
+    def get_attestation_history(
+        self, node_uuid: str | None = None, limit: int = 100
+    ) -> list[AttestationResult]:
         """Get attestation results, optionally filtered by node.
 
         Args:
@@ -324,7 +336,7 @@ class AttestationManager:
             results = [r for r in results if r.claim.node_uuid == node_uuid]
         return list(reversed(results[-limit:]))
 
-    def _find_baseline(self, node_type: Optional[str] = None) -> Optional[BaselineEntry]:
+    def _find_baseline(self, node_type: str | None = None) -> BaselineEntry | None:
         """Find the current (non-superseded) baseline for a node type."""
         if node_type is not None:
             return self._baselines.get(node_type)
@@ -334,7 +346,7 @@ class AttestationManager:
                 return entry
         return None
 
-    def _get_baseline_hash(self, node_type: Optional[str] = None) -> Optional[str]:
+    def _get_baseline_hash(self, node_type: str | None = None) -> str | None:
         """Get just the hash string for a baseline."""
         baseline = self._find_baseline(node_type)
         return baseline.baseline_hash if baseline else None

@@ -23,12 +23,11 @@ import smtplib
 import ssl
 import time
 from email.mime.text import MIMEText
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from bedrock.licensing.checkout import (
-    CheckoutTier,
-    verify_webhook_signature,
     handle_checkout_completed,
+    verify_webhook_signature,
 )
 
 
@@ -74,8 +73,10 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 delivery = handle_checkout_completed(event)
                 self.log_message(
                     "License issued: tier=%s email=%s key=%s...%s",
-                    delivery.tier, delivery.customer_email,
-                    delivery.license_key[:8], delivery.license_key[-8:],
+                    delivery.tier,
+                    delivery.customer_email,
+                    delivery.license_key[:8],
+                    delivery.license_key[-8:],
                 )
 
                 # Send license key via email
@@ -139,6 +140,7 @@ def send_license_email(delivery) -> None:
     expires_str = ""
     if delivery.expires_at:
         from datetime import datetime
+
         expires_str = datetime.fromtimestamp(delivery.expires_at).strftime("%Y-%m-%d")
 
     body = f"""Bedrock {tier_display} License — {delivery.issued_to}
