@@ -1,6 +1,6 @@
 {
-  "name": "@bedrock/sdk",
-  "version": "0.1.0",
+  "name": "@infill/bedrock-sdk",
+  "version": "0.3.0",
   "description": "Bedrock SDK — Identity-based security framework for TypeScript/JavaScript. Every node is a user. Everything between is encrypted at rest.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -12,7 +12,8 @@
     "test": "jest --coverage",
     "test:watch": "jest --watch",
     "lint": "eslint src/ --ext .ts",
-    "clean": "rm -rf dist/"
+    "clean": "rm -rf dist/",
+    "prepack": "npm run build"
   },
   "keywords": [
     "security",
@@ -21,11 +22,22 @@
     "e2ee",
     "consent",
     "audit",
-    "compliance"
+    "compliance",
+    "bedrock",
+    "infill"
   ],
   "author": "InFill Systems, LLC",
   "license": "SEE LICENSE IN LICENSE",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drc10101/bedrock.git",
+    "directory": "sdk-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/drc10101/bedrock/issues"
+  },
+  "homepage": "https://github.com/drc10101/bedrock#readme",
+  "private": false,
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
