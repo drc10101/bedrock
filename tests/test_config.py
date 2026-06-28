@@ -38,9 +38,17 @@ class TestCoreConfig:
         assert config.dev_max_nodes == 3
 
     def test_from_env_defaults(self):
-        config = CoreConfig.from_env()
-        assert config.environment == "development"
-        assert config.licensing.dev_mode is True
+        # Clear env vars so defaults kick in
+        saved_env = {}
+        for key in ("BEDROCK_ENV", "BEDROCK_TIER", "BEDROCK_DEV_MODE"):
+            if key in os.environ:
+                saved_env[key] = os.environ.pop(key)
+        try:
+            config = CoreConfig.from_env()
+            assert config.environment == "development"
+            assert config.licensing.dev_mode is True
+        finally:
+            os.environ.update(saved_env)
 
     def test_from_env_override(self):
         os.environ["BEDROCK_ENV"] = "production"
