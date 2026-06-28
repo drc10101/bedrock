@@ -15,7 +15,6 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: Other/Proprietary",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -24,18 +23,19 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Security :: Cryptography",
-    "License :: Other/Proprietary License",
 ]
-
 dependencies = [
-    # Core crypto — proven in InFill
     "cryptography>=42.0",
-    # Async framework
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
-    # UUID v7 (time-sortable)
     "uuid7>=0.1",
 ]
+
+[project.urls]
+Homepage = "https://bedrock.dev"
+Repository = "https://github.com/drc10101/bedrock"
+Documentation = "https://bedrock.dev/docs"
+Issues = "https://github.com/drc10101/bedrock/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -48,15 +48,12 @@ dev = [
     "isort>=5.13",
 ]
 sqlcipher = [
-    # Optional: encrypted SQLite storage for production
     "sqlcipher3>=0.5",
 ]
 hsm = [
-    # Optional: HSM integration for production key storage
     "pkcs11>=1.1",
 ]
 stripe = [
-    # Optional: Stripe integration for license billing
     "stripe>=10.0",
 ]
 
@@ -79,7 +76,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "C4"]
-ignore = ["E501"]  # Line length handled by black
+ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"

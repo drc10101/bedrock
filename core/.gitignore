@@ -1,2 +1,8 @@
 dist/
 *.egg-info/
+
+# Copied from repo root for PyPI packaging
+/LICENSE
+/README.md
+/SECURITY.md
+/CONTRIBUTING.md
