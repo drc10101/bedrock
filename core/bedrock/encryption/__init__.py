@@ -13,13 +13,16 @@ from bedrock.encryption.engine import (
     EncryptionEngine,
     FieldEncryptor,
 )
+from bedrock.encryption.legacy import LegacyDecryptor, is_infill_legacy
 from bedrock.encryption.version import CiphertextFormat
 
 __all__ = [
     "EncryptionEngine",
     "FieldEncryptor",
     "E2EEDeliverer",
+    "LegacyDecryptor",
     "AAD",
     "build_aad",
     "CiphertextFormat",
+    "is_infill_legacy",
 ]

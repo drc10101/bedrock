@@ -252,8 +252,12 @@ class AuditChain:
                 return False
             if i > start_index and entry.prev_hash != self._chain[i - 1].entry_hash:
                 return False
-            if i == start_index and start_index > 0 and entry.prev_hash != self._chain[start_index - 1].entry_hash:
-                    return False
+            if (
+                i == start_index
+                and start_index > 0
+                and entry.prev_hash != self._chain[start_index - 1].entry_hash
+            ):
+                return False
 
         return True
 

@@ -234,7 +234,11 @@ class ConsentGate:
             return None
 
         # Auto-transition expired events
-        if event.status == ConsentStatus.APPROVED and event.expires_at and datetime.now(UTC) > event.expires_at:
+        if (
+            event.status == ConsentStatus.APPROVED
+            and event.expires_at
+            and datetime.now(UTC) > event.expires_at
+        ):
             event.status = ConsentStatus.EXPIRED
             return None
 

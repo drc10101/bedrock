@@ -33,6 +33,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from bedrock.encryption.aad import AAD, build_aad
+from bedrock.encryption.legacy import LegacyDecryptor, _is_bedrock_v2
 from bedrock.encryption.version import CiphertextFormat
 from bedrock.key_management.keys import KeyManager
 
@@ -206,6 +207,89 @@ class FieldEncryptor:
             raise ValueError("Decryption failed: wrong key or corrupted ciphertext.") from e
 
         return plaintext_bytes.decode("utf-8")
+
+    # ------------------------------------------------------------------
+    # Simplified API for InFill integration
+    # ------------------------------------------------------------------
+
+    def encrypt_simple(
+        self, plaintext: str, silo: str = "infill", record_id: str = "field", scope: str = "read"
+    ) -> str:
+        """Encrypt with sensible defaults — drop-in for InFill's encrypt_field().
+
+        Uses AAD binding with the provided silo/record_id/scope (defaults to
+        "infill"/"field"/"read"). All new ciphertext uses the Bedrock v2 wire
+        format with embedded AAD.
+
+        Args:
+            plaintext: The data to encrypt.
+            silo: Silo name for key derivation and AAD (default: "infill").
+            record_id: Record identifier for AAD (default: "field").
+            scope: Access scope for AAD (default: "read").
+
+        Returns:
+            Bedrock v2 ciphertext with embedded AAD.
+        """
+        return self.encrypt(plaintext, silo=silo, record_id=record_id, scope=scope)
+
+    def decrypt_auto(
+        self,
+        ciphertext: str,
+        silo: str = "infill",
+        record_id: str = "field",
+        scope: str = "read",
+        legacy_key: bytes | None = None,
+    ) -> str:
+        """Auto-detect ciphertext format and decrypt.
+
+        Handles three formats:
+        1. Bedrock v2 (with embedded AAD) — extracts AAD from ciphertext,
+           validates against provided silo/record_id/scope.
+        2. InFill v2 (no AAD) — decrypted via LegacyDecryptor using
+           the legacy_key (InFill's .encryption_key bytes).
+        3. Fernet (gAAAA...) — decrypted via LegacyDecryptor.
+
+        Args:
+            ciphertext: Encrypted string in any supported format.
+            silo: Expected silo for Bedrock v2 AAD validation.
+            record_id: Expected record_id for Bedrock v2 AAD validation.
+            scope: Expected scope for Bedrock v2 AAD validation.
+            legacy_key: InFill's .encryption_key bytes (required for
+                InFill v2 or Fernet ciphertext). If None and the
+                ciphertext is legacy, raises ValueError.
+
+        Returns:
+            Decrypted plaintext string.
+
+        Raises:
+            ValueError: If ciphertext format is unsupported or AAD mismatch.
+        """
+        fmt = CiphertextFormat.detect(ciphertext)
+
+        if fmt == CiphertextFormat.V2_GCM:
+            # Distinguish Bedrock v2 (with AAD) from InFill v2 (no AAD)
+            if _is_bedrock_v2(ciphertext):
+                return self.decrypt(ciphertext, silo=silo, record_id=record_id, scope=scope)
+            else:
+                # InFill v2 — needs legacy key
+                if legacy_key is None:
+                    raise ValueError(
+                        "InFill v2 ciphertext requires legacy_key "
+                        "(the .encryption_key bytes from InFill)"
+                    )
+                decryptor = LegacyDecryptor(legacy_key)
+                return decryptor.decrypt(ciphertext)
+
+        if fmt == CiphertextFormat.V1_FERNET:
+            if legacy_key is None:
+                raise ValueError(
+                    "Fernet ciphertext requires legacy_key "
+                    "(the .encryption_key bytes from InFill)"
+                )
+            decryptor = LegacyDecryptor(legacy_key)
+            return decryptor.decrypt(ciphertext)
+
+        raise ValueError(f"Unsupported ciphertext format: {fmt}")
 
 
 class E2EEDeliverer:
