@@ -1,6 +1,6 @@
 # Bedrock Technical Notes
 
-**Version:** 0.1.0  
+**Version:** 0.3.0  
 **Classification:** TRADE SECRET — InFill Systems, LLC  
 **Purpose:** Plain-English documentation of every Bedrock component, what it does, and why it exists.
 
@@ -1849,3 +1849,70 @@ Stripe product and pricing created in test mode for developer license tiers.
 - `bedrock.licensing.__init__` — exported new Stripe constants
 
 **Test count:** 930 total (788 Python + 20 SDK + 122 TypeScript), all passing.
+
+---
+
+## B-324: Repo Cleanup for GitHub Release
+
+**Status:** Complete
+
+Repository hygiene for public distribution:
+- Removed stale `sdk/` shadow directory (replaced by `sdk-python/`)
+- Removed InFill-specific `integrations/` directory
+- Removed root `requirements.txt` (dup of pyproject.toml)
+- Added `LICENSE` (proprietary, InFill Systems, LLC)
+- Added `CHANGELOG.md` (B-311 through B-323)
+- Added `CONTRIBUTING.md` (dev setup, PR process, security reporting)
+- Added `SECURITY.md` (vulnerability reporting, disclosure policy)
+- Added `core/MANIFEST.in` (package distribution manifest)
+- Rewrote `README.md` for public-facing developer documentation
+- Fixed `pyproject.toml`: removed duplicate `cryptography` dep, removed wrong `hashlib` dep, moved `sqlcipher3` to optional extra, added `[stripe]` optional extra, bumped to v0.3.0
+- Updated `.gitignore` and `.github/workflows/ci.yml`
+- Version bump to 0.3.0 across `__init__.py`, `cli.py`, `pyproject.toml`
+
+**Commit:** `77e580a`
+
+---
+
+## B-325: PyPI Distribution Package
+
+**Status:** Complete
+
+Built and published Python wheel and source distribution:
+- `bedrock_core-0.3.0-py3-none-any.whl` (110KB) — 49 files including all modules
+- `bedrock_core-0.3.0.tar.gz` (92KB) — source distribution
+- Console script entry point: `bedrock = bedrock.cli:main`
+- GitHub Release v0.3.0 with both assets uploaded
+- Package `Private :: Do Not Upload` classifier prevents accidental PyPI publication
+
+**Install:** `pip install bedrock_core-0.3.0-py3-none-any.whl`
+
+**Commit:** `c1fb67f`
+
+---
+
+## B-326: npm Package Distribution
+
+**Status:** Complete
+
+TypeScript SDK packaged as `@infill/bedrock-sdk` v0.3.0:
+- Tarball: `infill-bedrock-sdk-0.3.0.tgz` (32.3KB, 47 files)
+- Includes: LICENSE, README, compiled JS + type declarations
+- Uploaded to GitHub release v0.3.0
+
+**Install:** `npm install infill-bedrock-sdk-0.3.0.tgz`
+
+**Commit:** `89f75b1`
+
+---
+
+## B-327: Docker Image Configuration
+
+**Status:** Complete
+
+Dockerfile and docker-compose.yml updated for v0.3.0:
+- Replaced `requirements.txt` COPY with `pip install /opt/bedrock/core`
+- Python 3.12-slim base image
+- Added OCI image labels
+- docker-compose.yml updated for pip install flow
+- No Docker on dev machine — CI will build images

@@ -1,28 +1,28 @@
-FROM python:3.14-slim AS base
+FROM python:3.12-slim AS base
 
 # Metadata
 LABEL maintainer="InFill Systems, LLC"
 LABEL description="Bedrock Core — Identity-based encrypted data framework"
-LABEL version="1.0.0"
+LABEL version="0.3.0"
+LABEL org.opencontainers.image.source="https://github.com/drc10101/bedrock"
+LABEL org.opencontainers.image.title="Bedrock Core"
+LABEL org.opencontainers.image.description="Identity-based security framework. Every node is a user. Everything between is encrypted at rest."
 
 # Security: run as non-root
 RUN groupadd -r bedrock && useradd -r -g bedrock -d /opt/bedrock -s /sbin/nologin bedrock
 
 WORKDIR /opt/bedrock
 
-# Install system deps (cryptography needs libffi, cargo for building)
+# Install system deps (cryptography needs libffi + build tools)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application
-COPY core/ ./core/
+# Copy and install the package
+COPY core/ /opt/bedrock/core/
+RUN pip install --no-cache-dir /opt/bedrock/core
 
 # Create runtime directories
 RUN mkdir -p /var/lib/bedrock/audit /etc/bedrock /var/log/bedrock && \

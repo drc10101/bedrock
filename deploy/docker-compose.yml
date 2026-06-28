@@ -17,7 +17,6 @@ services:
       - BEDROCK_TIER=developer
       - BEDROCK_MASTER_KEY_FILE=/run/secrets/master_key
     volumes:
-      - ../core:/opt/bedrock/core:ro
       - bedrock-audit:/var/lib/bedrock/audit
       - bedrock-config:/etc/bedrock
     secrets:
@@ -41,9 +40,6 @@ services:
       - BEDROCK_ENV=test
       - BEDROCK_DEV_MODE=true
       - BEDROCK_TIER=developer
-    volumes:
-      - ../tests:/opt/bedrock/tests:ro
-      - ../core:/opt/bedrock/core:ro
     profiles:
       - test
 
