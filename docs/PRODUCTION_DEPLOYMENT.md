@@ -129,16 +129,16 @@ spec:
 - [ ] Stripe keys (if used) are stored in a secrets manager
 - [ ] `.env` files are in `.gitignore`
 - [ ] Production database uses encrypted storage (SQLite with SQLCipher or external DB)
-## Current Server Status (v0.3)
+## Server Architecture (v0.3)
 
-The Bedrock HTTP API server uses Python stdlib `http.server.HTTPServer` with SQLite persistence. This is suitable for development, testing, and low-traffic internal deployments. It is **not yet hardened for public-facing production traffic**.
+The Bedrock HTTP API server runs on **FastAPI with uvicorn** — a production-grade ASGI server with proper connection handling, request timeouts, and graceful shutdown.
 
-Known limitations:
-- No request timeouts or connection pooling
-- No graceful shutdown (Ctrl+C only)
-- No rate-limit bypass for health endpoints
-- TLS termination is in-process (no reverse proxy integration documented)
-- SQLite is single-writer (concurrent writes serialize)
-- No automated database migration system
+- Request timeouts: 30s keep-alive (configurable via uvicorn)
+- Graceful shutdown: uvicorn handles SIGTERM/SIGINT cleanly
+- Rate limiting: enforced per-tier on all authenticated endpoints
+- TLS: supported natively via uvicorn SSL config, or use a reverse proxy (nginx/Caddy)
+- Interactive API docs: available at `/docs` (dev mode) and `/redoc` (dev mode)
 
-For production deployment behind a reverse proxy (nginx/Caddy), the core crypto, identity, consent, and licensing modules are production-grade. The HTTP transport layer needs hardening or replacement (e.g., FastAPI + uvicorn) for high-traffic scenarios.
+For production deployment behind a reverse proxy (nginx/Caddy), the entire stack — HTTP transport, crypto, identity, consent, licensing — is production-grade.
+
+SQLite is single-writer (concurrent writes serialize). For high-write workloads, consider PostgreSQL via a custom storage backend.

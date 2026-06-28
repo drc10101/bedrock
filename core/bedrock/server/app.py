@@ -1,5 +1,5 @@
 """
-Bedrock Core — HTTP API Server.
+Bedrock Core — FastAPI HTTP Server.
 
 Exposes Bedrock Core functionality as a REST API for frontend integration.
 Designed for the InFill portal and other Bedrock-based applications.
@@ -15,22 +15,24 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 from __future__ import annotations
 
-import json
 import time
 import uuid
-from collections.abc import Callable
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qs, urlparse
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, Response
 
 from bedrock.config import CoreConfig
 from bedrock.health import HealthChecker
-from bedrock.server.tls import TLSConfig, wrap_server_with_tls
+from bedrock.server.tls import TLSConfig
 from bedrock.storage.persistence import PersistentBedrock
 from bedrock.storage.sqlite_backend import SQLiteBackend
 
 if TYPE_CHECKING:
     from bedrock.metering import UsageMeter
+
+
+# ── Error classes (preserved for backward compat) �──
 
 
 class APIError(Exception):
@@ -57,305 +59,203 @@ class NotFoundError(APIError):
         super().__init__(f"{resource} not found", status=404)
 
 
-class BedrockAPIHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for Bedrock Core API."""
+# ── FastAPI app factory ──
 
-    # Config and core modules — set by server before serving
-    config: CoreConfig | None = None
-    api_keys: dict[str, dict] = {}  # api_key -> {tier, node_id, roles}
-    usage_meter: UsageMeter | None = None  # Set by create_server
-    persistent: PersistentBedrock | None = None  # Set by create_server
 
-    def log_message(self, fmt: str, *args: Any) -> None:
-        """Override to use structured logging."""
-        if self.config and self.config.log_format == "json":
-            print(
-                json.dumps(
-                    {
-                        "timestamp": time.time(),
-                        "level": "INFO",
-                        "method": self.command,
-                        "path": self.path,
-                        "message": fmt % args,
-                    }
-                )
-            )
-        else:
-            super().log_message(fmt, *args)
+def create_app(
+    config: CoreConfig | None = None,
+    api_keys: dict[str, dict] | None = None,
+    tls_config: Any | None = None,
+    enable_metering: bool = True,
+    db_path: str = "bedrock.db",
+) -> FastAPI:
+    """Create and configure the Bedrock Core FastAPI application.
 
-    def _send_json(self, data: Any, status: int = 200) -> None:
-        """Send JSON response with rate limit headers."""
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("X-Request-Id", str(uuid.uuid4()))
+    Args:
+        config: Core configuration (loaded from env if not provided).
+        api_keys: Dict of api_key -> {tier, node_id, roles}.
+        tls_config: TLS configuration (used by uvicorn, not FastAPI directly).
+        enable_metering: Whether to enable usage metering and rate limiting.
+        db_path: Path to the SQLite database for persistence.
 
-        # Add rate limit headers if metering is enabled
-        if self.usage_meter and hasattr(self, "_auth_key"):
-            rl_status = self.usage_meter.get_rate_limit_status(str(self._auth_key))
-            self.send_header(
-                "X-RateLimit-Minute-Remaining", str(rl_status.get("minute_remaining", 0))
-            )
-            self.send_header("X-RateLimit-Hour-Remaining", str(rl_status.get("hour_remaining", 0)))
+    Returns:
+        Configured FastAPI application instance.
+    """
+    from bedrock.metering import UsageMeter
 
-        self.end_headers()
-        self.wfile.write(
-            json.dumps(data, indent=2 if self.config and self.config.debug else None).encode()
-        )
+    effective_config = config or CoreConfig.from_env()
+    effective_api_keys = api_keys or {}
+    meter: UsageMeter | None = UsageMeter() if enable_metering else None
+    persistent = PersistentBedrock(storage=SQLiteBackend(db_path))
+    persistent.restore_all()
 
-    def _send_error(self, message: str, status: int = 400) -> None:
-        """Send error response."""
-        self._send_json({"error": message, "status": status}, status)
+    app = FastAPI(
+        title="Bedrock Core API",
+        version="0.3.0",
+        description="Identity-based security framework API",
+        docs_url="/docs" if effective_config.debug else None,
+        redoc_url="/redoc" if effective_config.debug else None,
+    )
 
-    def _authenticate(self) -> dict[str, Any] | None:
+    # Store shared state on app.state for access in handlers
+    app.state.config = effective_config
+    app.state.api_keys = effective_api_keys
+    app.state.usage_meter = meter
+    app.state.persistent = persistent
+
+    # ── Auth dependency ──
+
+    async def _authenticate(authorization: str | None = Header(None)) -> dict[str, Any]:
         """Validate API key from Authorization header."""
-        auth_header = self.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer ") or auth_header.startswith("ApiKey "):
-            api_key = auth_header[7:]
-        else:
-            return None
+        if not authorization:
+            raise HTTPException(status_code=401, detail="Authentication required")
 
-        if api_key in self.api_keys:
-            return self.api_keys[api_key]
-        return None
+        api_key: str | None = None
+        if authorization.startswith("Bearer ") or authorization.startswith("ApiKey "):
+            api_key = authorization[7:]
 
-    def _require_auth(self) -> dict[str, Any]:
-        """Require authentication, raise 401 if missing."""
-        identity = self._authenticate()
-        if identity is None:
-            raise AuthenticationError()
-        return identity
+        if not api_key or api_key not in effective_api_keys:
+            raise HTTPException(status_code=401, detail="Invalid API key")
 
-    def _parse_body(self) -> dict[str, Any]:
-        """Parse JSON request body."""
-        content_length = int(self.headers.get("Content-Length", 0))
-        if content_length == 0:
-            return {}
-        body = self.rfile.read(content_length)
-        result: dict[str, Any] = json.loads(body)
-        return result
+        return effective_api_keys[api_key]
 
-    def _route(self, method: str, path: str) -> tuple[Callable[..., Any], dict[str, str]]:
-        """Route request to handler. Returns (handler_fn, path_params)."""
-        routes = {
-            # Health (no auth required)
-            ("GET", "/health"): self._handle_health,
-            ("GET", "/health/detailed"): self._handle_health_detailed,
-            # Identity
-            ("POST", "/api/v1/nodes"): self._handle_register_node,
-            ("GET", "/api/v1/nodes"): self._handle_list_nodes,
-            ("GET", "/api/v1/nodes/{node_id}"): self._handle_get_node,
-            ("POST", "/api/v1/certificates"): self._handle_issue_certificate,
-            ("DELETE", "/api/v1/certificates/{node_id}"): self._handle_revoke_certificate,
-            # Data Separation
-            ("POST", "/api/v1/silos"): self._handle_create_silo,
-            ("GET", "/api/v1/silos"): self._handle_list_silos,
-            # Consent
-            ("POST", "/api/v1/consent"): self._handle_request_consent,
-            ("PUT", "/api/v1/consent/{consent_id}/approve"): self._handle_approve_consent,
-            ("PUT", "/api/v1/consent/{consent_id}/deny"): self._handle_deny_consent,
-            # Encryption
-            ("POST", "/api/v1/encrypt"): self._handle_encrypt,
-            ("POST", "/api/v1/decrypt"): self._handle_decrypt,
-            # Audit
-            ("GET", "/api/v1/audit"): self._handle_query_audit,
-            ("GET", "/api/v1/audit/verify"): self._handle_verify_audit,
-            # Licensing
-            ("POST", "/api/v1/license/validate"): self._handle_validate_license,
-            # Usage metering
-            ("GET", "/api/v1/usage"): self._handle_usage,
-        }
+    # ── Rate limiting middleware ──
 
-        # Try exact match first
-        key = (method, path)
-        if key in routes:
-            return routes[key], {}
-
-        # Try parameterized routes
-        parts = path.strip("/").split("/")
-        if len(parts) >= 3 and parts[0] == "api" and parts[1] == "v1":
-            # /api/v1/nodes/{node_id}
-            if method == "GET" and parts[2] == "nodes" and len(parts) == 4:
-                return self._handle_get_node, {"node_id": parts[3]}
-            # /api/v1/certificates/{node_id} (DELETE)
-            if method == "DELETE" and parts[2] == "certificates" and len(parts) == 4:
-                return self._handle_revoke_certificate, {"node_id": parts[3]}
-            # /api/v1/consent/{consent_id}/approve (PUT)
-            if method == "PUT" and parts[2] == "consent" and len(parts) == 5:
-                if parts[4] == "approve":
-                    return self._handle_approve_consent, {"consent_id": parts[3]}
-                if parts[4] == "deny":
-                    return self._handle_deny_consent, {"consent_id": parts[3]}
-
-        raise NotFoundError()
-
-    # ── HTTP Methods ──
-
-    def do_GET(self) -> None:
-        self._handle_request("GET")
-
-    def do_POST(self) -> None:
-        self._handle_request("POST")
-
-    def do_PUT(self) -> None:
-        self._handle_request("PUT")
-
-    def do_DELETE(self) -> None:
-        self._handle_request("DELETE")
-
-    def _handle_request(self, method: str) -> None:
-        """Route and execute request with rate limiting, metering, and error handling."""
-        parsed = urlparse(self.path)
-        path = parsed.path
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next: Any) -> Response:
         start_time = time.time()
 
-        # Authenticate and get identity (for rate limiting)
-        self._auth_key = None
-        try:
-            identity = self._authenticate()
-            if identity:
-                self._auth_key = identity.get("node_id", "")
+        # Authenticate for rate limiting
+        auth_header = request.headers.get("authorization", "")
+        auth_key = ""
+        tier = "developer"
+
+        if auth_header and (auth_header.startswith("Bearer ") or auth_header.startswith("ApiKey ")):
+            api_key = auth_header[7:]
+            if api_key in effective_api_keys:
+                identity = effective_api_keys[api_key]
+                auth_key = identity.get("node_id", "")
                 tier = identity.get("tier", "developer")
-            else:
-                tier = "developer"
-        except Exception:
-            tier = "developer"
 
         # Rate limit check
-        if self.usage_meter and self._auth_key:
-            allowed, reason = self.usage_meter.check_rate_limit(self._auth_key, tier)
+        if meter and auth_key:
+            allowed, reason = meter.check_rate_limit(auth_key, tier)
             if not allowed:
-                self._send_error(f"Rate limit exceeded: {reason}", 429)
-                return
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": f"Rate limit exceeded: {reason}", "status": 429},
+                )
 
-        try:
-            handler, params = self._route(method, path)
-            handler(**params)
-            status_code = 200  # Default success
-        except APIError as e:
-            self._send_error(e.message, e.status)
-            status_code = e.status
-        except json.JSONDecodeError:
-            self._send_error("Invalid JSON body", 400)
-            status_code = 400
-        except Exception as e:
-            self._send_error(f"Internal error: {str(e)}", 500)
-            status_code = 500
+        # Process request
+        response: Response = await call_next(request)
 
-        # Record usage for metering
-        if self.usage_meter and self._auth_key:
+        # Record usage
+        if meter and auth_key:
             elapsed_ms = (time.time() - start_time) * 1000
-            self.usage_meter.record_usage(
-                license_key=self._auth_key,
-                endpoint=path,
-                method=method,
-                status_code=status_code,
+            meter.record_usage(
+                license_key=auth_key,
+                endpoint=request.url.path,
+                method=request.method,
+                status_code=response.status_code,
                 response_time_ms=elapsed_ms,
                 tier=tier,
             )
 
+        # Add rate limit headers
+        if meter and auth_key:
+            rl_status = meter.get_rate_limit_status(auth_key)
+            response.headers["X-RateLimit-Minute-Remaining"] = str(
+                rl_status.get("minute_remaining", 0)
+            )
+            response.headers["X-RateLimit-Hour-Remaining"] = str(rl_status.get("hour_remaining", 0))
+
+        response.headers["X-Request-Id"] = str(uuid.uuid4())
+        return response
+
     # ── Health Endpoints (no auth) ──
 
-    def _handle_health(self) -> None:
-        """GET /health — Basic health check."""
-        checker = HealthChecker(self.config)
+    @app.get("/health")
+    async def health_check() -> JSONResponse:
+        """Basic health check."""
+        checker = HealthChecker(effective_config)
         report = checker.check()
-        status = 200 if report.is_healthy() else 503
-        self._send_json(report.to_dict(), status)
+        status_code = 200 if report.is_healthy() else 503
+        return JSONResponse(content=report.to_dict(), status_code=status_code)
 
-    def _handle_health_detailed(self) -> None:
-        """GET /health/detailed — Detailed component health."""
-        self._require_auth()
-        checker = HealthChecker(self.config)
+    @app.get("/health/detailed")
+    async def health_detailed(identity: dict[str, Any] = Depends(_authenticate)) -> dict[str, Any]:
+        """Detailed component health (requires auth)."""
+        checker = HealthChecker(effective_config)
         report = checker.check()
-        self._send_json(report.to_dict())
+        return report.to_dict()
 
     # ── Identity Endpoints ──
 
-    def _handle_register_node(self) -> None:
-        """POST /api/v1/nodes — Register a new node."""
-        self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        node = self.persistent.registry.register(
+    @app.post("/api/v1/nodes", status_code=201)
+    async def register_node(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Register a new node."""
+        body = await request.json()
+        node = persistent.registry.register(
             name=body.get("name", f"node-{uuid.uuid4().hex[:8]}"),
             node_type=body.get("node_type", "generic"),
         )
-        self.persistent.save_node(node)
+        persistent.save_node(node)
+        return {
+            "node_id": node.node_id.uuid,
+            "name": node.name,
+            "state": node.state.value,
+        }
 
-        self._send_json(
-            {
-                "node_id": node.node_id.uuid,
-                "name": node.name,
-                "state": node.state.value,
-            },
-            201,
-        )
-
-    def _handle_list_nodes(self) -> None:
-        """GET /api/v1/nodes — List all nodes."""
-        self._require_auth()
-        if self.persistent is None:
-            self._send_json({"nodes": [], "total": 0})
-            return
-
+    @app.get("/api/v1/nodes")
+    async def list_nodes(identity: dict[str, Any] = Depends(_authenticate)) -> dict[str, Any]:
+        """List all nodes."""
         nodes = [
             {"node_id": n.node_id.uuid, "name": n.name, "state": n.state.value}
-            for n in self.persistent.registry._nodes.values()
+            for n in persistent.registry._nodes.values()
         ]
-        self._send_json({"nodes": nodes, "total": len(nodes)})
+        return {"nodes": nodes, "total": len(nodes)}
 
-    def _handle_get_node(self, node_id: str = "") -> None:
-        """GET /api/v1/nodes/{node_id} — Get node details."""
-        self._require_auth()
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        node = self.persistent.registry.get(node_id)
+    @app.get("/api/v1/nodes/{node_id}")
+    async def get_node(
+        node_id: str, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Get node details."""
+        node = persistent.registry.get(node_id)
         if node is None:
-            self._send_error("Node not found", 404)
-            return
+            raise HTTPException(status_code=404, detail="Node not found")
+        return {
+            "node_id": node.node_id.uuid,
+            "name": node.name,
+            "state": node.state.value,
+        }
 
-        self._send_json(
-            {
-                "node_id": node.node_id.uuid,
-                "name": node.name,
-                "state": node.state.value,
-            }
-        )
-
-    def _handle_issue_certificate(self) -> None:
-        """POST /api/v1/certificates — Issue a certificate."""
-        self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
+    @app.post("/api/v1/certificates", status_code=201)
+    async def issue_certificate(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Issue a certificate."""
+        body = await request.json()
         # Look up existing node if node_uuid provided, otherwise register new
         node_uuid = body.get("node_uuid")
         if node_uuid:
-            node = self.persistent.registry.get(node_uuid)
+            node = persistent.registry.get(node_uuid)
             if node is None:
-                self._send_error(f"Node {node_uuid} not found", 404)
-                return
+                raise HTTPException(status_code=404, detail=f"Node {node_uuid} not found")
         else:
-            node = self.persistent.registry.register(
-                name=body.get("node_name", "api-node"), node_type=body.get("node_type", "generic")
+            node = persistent.registry.register(
+                name=body.get("node_name", "api-node"),
+                node_type=body.get("node_type", "generic"),
             )
-            self.persistent.save_node(node)
+            persistent.save_node(node)
 
-        cert = self.persistent.cert_manager.issue_certificate(
+        cert = persistent.cert_manager.issue_certificate(
             node_uuid=node.node_id.uuid,
             node_name=node.name,
             public_key_hash=node.node_id.public_key_hex(),
         )
-        self.persistent.save_certificate(
+        persistent.save_certificate(
             {
                 "serial_number": cert.serial,
                 "node_uuid": cert.node_uuid,
@@ -364,102 +264,82 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             }
         )
 
-        # Serialize certificate dataclass to dict
-        self._send_json(
-            {
-                "serial": cert.serial,
-                "node_uuid": cert.node_uuid,
-                "node_name": cert.node_name,
-                "status": cert.status.value if hasattr(cert.status, "value") else str(cert.status),
-                "issuer": cert.issuer,
-                "license_tier": (
-                    cert.license_tier.value
-                    if hasattr(cert.license_tier, "value")
-                    else str(cert.license_tier)
-                ),
-                "issued_at": (
-                    cert.issued_at.isoformat()
-                    if hasattr(cert.issued_at, "isoformat") and cert.issued_at is not None
-                    else str(cert.issued_at) if cert.issued_at is not None else ""
-                ),
-                "expires_at": (
-                    cert.expires_at.isoformat()
-                    if hasattr(cert.expires_at, "isoformat") and cert.expires_at is not None
-                    else str(cert.expires_at) if cert.expires_at is not None else ""
-                ),
-                "capabilities": cert.capabilities,
-            },
-            201,
-        )
+        return {
+            "serial": cert.serial,
+            "node_uuid": cert.node_uuid,
+            "node_name": cert.node_name,
+            "status": cert.status.value if hasattr(cert.status, "value") else str(cert.status),
+            "issuer": cert.issuer,
+            "license_tier": (
+                cert.license_tier.value
+                if hasattr(cert.license_tier, "value")
+                else str(cert.license_tier)
+            ),
+            "issued_at": (
+                cert.issued_at.isoformat()
+                if hasattr(cert.issued_at, "isoformat") and cert.issued_at is not None
+                else str(cert.issued_at) if cert.issued_at is not None else ""
+            ),
+            "expires_at": (
+                cert.expires_at.isoformat()
+                if hasattr(cert.expires_at, "isoformat") and cert.expires_at is not None
+                else str(cert.expires_at) if cert.expires_at is not None else ""
+            ),
+            "capabilities": cert.capabilities,
+        }
 
-    def _handle_revoke_certificate(self, node_id: str = "") -> None:
-        """DELETE /api/v1/certificates/{node_id} — Revoke certificate."""
-        self._require_auth()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        self.persistent.cert_manager.revoke_certificate(node_id, reason="Revoked via API")
-
-        self._send_json({"status": "revoked", "node_id": node_id})
+    @app.delete("/api/v1/certificates/{node_id}")
+    async def revoke_certificate(
+        node_id: str, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Revoke a certificate."""
+        try:
+            persistent.cert_manager.revoke_certificate(node_id, reason="Revoked via API")
+        except KeyError:
+            raise HTTPException(
+                status_code=404, detail=f"No certificate found for node '{node_id}'"
+            ) from None
+        return {"status": "revoked", "node_id": node_id}
 
     # ── Data Separation Endpoints ──
 
-    def _handle_create_silo(self) -> None:
-        """POST /api/v1/silos — Create a data silo."""
-        self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        silo = self.persistent.silo_manager.create_silo(
+    @app.post("/api/v1/silos", status_code=201)
+    async def create_silo(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Create a data silo."""
+        body = await request.json()
+        silo = persistent.silo_manager.create_silo(
             name=body.get("name", f"silo-{uuid.uuid4().hex[:8]}"),
             display_name=body.get("display_name", body.get("name", "New Silo")),
             categories=body.get("categories", []),
         )
-        self.persistent.save_silo(silo)
+        persistent.save_silo(silo)
 
-        self._send_json(
-            {
-                "name": silo.name,
-                "display_name": silo.display_name if hasattr(silo, "display_name") else silo.name,
-                "categories": body.get("categories", []),
-            },
-            201,
-        )
+        return {
+            "name": silo.name,
+            "display_name": silo.display_name if hasattr(silo, "display_name") else silo.name,
+            "categories": body.get("categories", []),
+        }
 
-    def _handle_list_silos(self) -> None:
-        """GET /api/v1/silos — List all silos."""
-        self._require_auth()
-
-        if self.persistent is None:
-            self._send_json({"silos": [], "total": 0})
-            return
-
-        silos = self.persistent.silo_manager.list_silos()
-
-        self._send_json(
-            {
-                "silos": [{"name": s.name} for s in silos],
-                "total": len(silos),
-            }
-        )
+    @app.get("/api/v1/silos")
+    async def list_silos(identity: dict[str, Any] = Depends(_authenticate)) -> dict[str, Any]:
+        """List all silos."""
+        silos = persistent.silo_manager.list_silos()
+        return {
+            "silos": [{"name": s.name} for s in silos],
+            "total": len(silos),
+        }
 
     # ── Consent Endpoints ──
 
-    def _handle_request_consent(self) -> None:
-        """POST /api/v1/consent — Request consent."""
-        identity = self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        result = self.persistent.consent_gate.request_consent(
+    @app.post("/api/v1/consent", status_code=201)
+    async def request_consent(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Request consent."""
+        body = await request.json()
+        result = persistent.consent_gate.request_consent(
             requesting_node_id=body.get("requesting_node_id", identity.get("node_id", "")),
             source_silo=body.get("source_silo", ""),
             target_silo=body.get("target_silo", ""),
@@ -467,72 +347,53 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             scope=body.get("scope", "read"),
             reason=body.get("reason", ""),
         )
+        return {
+            "consent_id": result.consent_id,
+            "status": "pending",
+        }
 
-        self._send_json(
-            {
-                "consent_id": result.consent_id,
-                "status": "pending",
-            },
-            201,
-        )
-
-    def _handle_approve_consent(self, consent_id: str = "") -> None:
-        """PUT /api/v1/consent/{consent_id}/approve — Approve consent."""
-        identity = self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        result = self.persistent.consent_gate.approve_consent(
+    @app.put("/api/v1/consent/{consent_id}/approve")
+    async def approve_consent(
+        consent_id: str, request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Approve consent."""
+        body = await request.json()
+        result = persistent.consent_gate.approve_consent(
             consent_id=consent_id,
             data_owner_id=body.get("data_owner_id", identity.get("node_id", "")),
         )
+        return {
+            "consent_id": result.consent_id if hasattr(result, "consent_id") else consent_id,
+            "status": "approved",
+        }
 
-        self._send_json(
-            {
-                "consent_id": result.consent_id if hasattr(result, "consent_id") else consent_id,
-                "status": "approved",
-            }
-        )
-
-    def _handle_deny_consent(self, consent_id: str = "") -> None:
-        """PUT /api/v1/consent/{consent_id}/deny — Deny consent."""
-        identity = self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
-        self.persistent.consent_gate.deny_consent(
+    @app.put("/api/v1/consent/{consent_id}/deny")
+    async def deny_consent(
+        consent_id: str, request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Deny consent."""
+        body = await request.json()
+        persistent.consent_gate.deny_consent(
             consent_id=consent_id,
             data_owner_id=body.get("data_owner_id", identity.get("node_id", "")),
             reason=body.get("reason", "Denied via API"),
         )
-
-        self._send_json(
-            {
-                "consent_id": consent_id,
-                "status": "denied",
-            }
-        )
+        return {
+            "consent_id": consent_id,
+            "status": "denied",
+        }
 
     # ── Encryption Endpoints ──
 
-    def _handle_encrypt(self) -> None:
-        """POST /api/v1/encrypt — Encrypt field data."""
-        self._require_auth()
-        body = self._parse_body()
-
-        if self.persistent is None:
-            self._send_error("Persistence not configured", 503)
-            return
-
+    @app.post("/api/v1/encrypt")
+    async def encrypt_field(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Encrypt field data."""
         from bedrock.encryption.engine import FieldEncryptor
         from bedrock.key_management.keys import KeyManager
 
+        body = await request.json()
         km = KeyManager()
         master_key = KeyManager.generate_master_key()
         fe = FieldEncryptor(km, master_key)
@@ -544,126 +405,127 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             scope=body.get("scope", "read"),
         )
 
-        self._send_json(
-            {
-                "ciphertext": (
-                    ciphertext.hex() if isinstance(ciphertext, bytes) else str(ciphertext)
-                ),
-                "silo": body.get("silo", "default"),
-            },
-            200,
+        return {
+            "ciphertext": ciphertext.hex() if isinstance(ciphertext, bytes) else str(ciphertext),
+            "silo": body.get("silo", "default"),
+        }
+
+    @app.post("/api/v1/decrypt")
+    async def decrypt_field(
+        request: Request, identity: dict[str, Any] = Depends(_authenticate)
+    ) -> dict[str, Any]:
+        """Decrypt field data."""
+        raise HTTPException(
+            status_code=501,
+            detail="Direct decrypt via API requires key management integration",
         )
-
-    def _handle_decrypt(self) -> None:
-        """POST /api/v1/decrypt — Decrypt field data."""
-        self._require_auth()
-        self._parse_body()
-
-        # Decrypt requires the same master key — in production, this would
-        # come from a key vault. For API demo, we require it in the request.
-        self._send_error("Direct decrypt via API requires key management integration", 501)
 
     # ── Audit Endpoints ──
 
-    def _handle_query_audit(self) -> None:
-        """GET /api/v1/audit — Query audit chain."""
-        self._require_auth()
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
-
-        if self.persistent is None:
-            self._send_json({"entries": [], "total": 0})
-            return
-
-        results = self.persistent.audit_chain.query(
-            actor_id=params.get("actor_id", [None])[0],
-            action=params.get("action", [None])[0],
-            silo=params.get("silo", [None])[0],
+    @app.get("/api/v1/audit")
+    async def query_audit(
+        actor_id: str | None = None,
+        action: str | None = None,
+        silo: str | None = None,
+        identity: dict[str, Any] = Depends(_authenticate),
+    ) -> dict[str, Any]:
+        """Query audit chain."""
+        results = persistent.audit_chain.query(
+            actor_id=actor_id,
+            action=action,
+            silo=silo,
         )
+        return {
+            "entries": [
+                {
+                    "actor_id": e.actor_id,
+                    "action": e.action,
+                    "target_id": e.target_id,
+                    "silo": e.silo,
+                }
+                for e in results
+            ],
+            "total": len(results),
+        }
 
-        self._send_json(
-            {
-                "entries": [
-                    {
-                        "actor_id": e.actor_id,
-                        "action": e.action,
-                        "target_id": e.target_id,
-                        "silo": e.silo,
-                    }
-                    for e in results
-                ],
-                "total": len(results),
-            }
-        )
-
-    def _handle_verify_audit(self) -> None:
-        """GET /api/v1/audit/verify — Verify audit chain integrity."""
-        self._require_auth()
-
-        if self.persistent is None:
-            self._send_json({"verified": False, "error": "Persistence not configured"})
-            return
-
-        verified = self.persistent.audit_chain.verify()
-
-        self._send_json({"verified": verified})
+    @app.get("/api/v1/audit/verify")
+    async def verify_audit(identity: dict[str, Any] = Depends(_authenticate)) -> dict[str, Any]:
+        """Verify audit chain integrity."""
+        verified = persistent.audit_chain.verify()
+        return {"verified": verified}
 
     # ── Licensing Endpoint ──
 
-    def _handle_validate_license(self) -> None:
-        """POST /api/v1/license/validate — Validate a license key."""
-        body = self._parse_body()
+    @app.post("/api/v1/license/validate")
+    async def validate_license(request: Request) -> dict[str, Any]:
+        """Validate a license key."""
+        from bedrock.licensing.enforcement import LicenseEnforcer, LicenseValidationError
 
-        from bedrock.licensing.enforcement import LicenseEnforcer
-
+        body = await request.json()
         enforcer = LicenseEnforcer()
-        license_obj = enforcer.validate_license(body.get("license_key", ""))
-
-        self._send_json(
-            {
-                "valid": license_obj.is_valid,
-                "tier": license_obj.tier.value,
-                "expires_at": license_obj.expires_at,
-                "features": license_obj.features,
+        try:
+            license_obj = enforcer.validate_license(body.get("license_key", ""))
+        except LicenseValidationError as e:
+            return {
+                "valid": False,
+                "tier": "unknown",
+                "expires_at": None,
+                "features": [],
+                "error": str(e),
             }
-        )
+        return {
+            "valid": license_obj.is_valid,
+            "tier": license_obj.tier.value,
+            "expires_at": license_obj.expires_at,
+            "features": license_obj.features,
+        }
 
     # ── Usage Metering Endpoint ──
 
-    def _handle_usage(self) -> None:
-        """GET /api/v1/usage — Get usage summary for authenticated key."""
-        identity = self._require_auth()
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
+    @app.get("/api/v1/usage")
+    async def get_usage(
+        hours: float = Query(1.0),
+        identity: dict[str, Any] = Depends(_authenticate),
+    ) -> dict[str, Any]:
+        """Get usage summary for authenticated key."""
+        if not meter:
+            return {"usage": {}, "message": "Usage metering not enabled"}
 
-        if not self.usage_meter:
-            self._send_json({"usage": {}, "message": "Usage metering not enabled"})
-            return
-
-        hours = float(params.get("hours", ["1"])[0])
-        license_key = self._auth_key or identity.get("node_id", "")
+        license_key = identity.get("node_id", "")
         tier = identity.get("tier", "developer")
+        summary = meter.get_usage_summary(license_key, tier, hours)
+        rl_status = meter.get_rate_limit_status(license_key)
 
-        summary = self.usage_meter.get_usage_summary(license_key, tier, hours)
-        rl_status = self.usage_meter.get_rate_limit_status(license_key)
+        return {
+            "usage": {
+                "total_requests": summary.total_requests,
+                "requests_by_endpoint": summary.requests_by_endpoint,
+                "requests_by_method": summary.requests_by_method,
+                "requests_by_status": summary.requests_by_status,
+                "avg_response_time_ms": round(summary.avg_response_time_ms, 2),
+                "total_bytes_sent": summary.total_bytes_sent,
+                "throttled_count": summary.rate_limit_throttled,
+                "blocked_count": summary.rate_limit_blocked,
+                "monthly_used": meter.get_monthly_usage(license_key),
+            },
+            "rate_limits": rl_status,
+            "period_hours": hours,
+        }
 
-        self._send_json(
-            {
-                "usage": {
-                    "total_requests": summary.total_requests,
-                    "requests_by_endpoint": summary.requests_by_endpoint,
-                    "requests_by_method": summary.requests_by_method,
-                    "requests_by_status": summary.requests_by_status,
-                    "avg_response_time_ms": round(summary.avg_response_time_ms, 2),
-                    "total_bytes_sent": summary.total_bytes_sent,
-                    "throttled_count": summary.rate_limit_throttled,
-                    "blocked_count": summary.rate_limit_blocked,
-                    "monthly_used": self.usage_meter.get_monthly_usage(license_key),
-                },
-                "rate_limits": rl_status,
-                "period_hours": hours,
-            }
-        )
+    # ── Lifespan event ──
+
+    @app.on_event("startup")
+    async def startup_event() -> None:
+        scheme = "https" if (tls_config and tls_config.enabled) else "http"
+        print(f"Bedrock Core API server started ({scheme})")
+        print(f"Environment: {effective_config.environment}")
+        print(f"Tier: {effective_config.licensing.tier}")
+        print(f"Usage metering: {'enabled' if meter else 'disabled'}")
+
+    return app
+
+
+# ── Backward-compatible entry points ──
 
 
 def create_server(
@@ -671,55 +533,29 @@ def create_server(
     port: int = 8443,
     config: CoreConfig | None = None,
     api_keys: dict[str, dict] | None = None,
-    tls_config: TLSConfig | None = None,
+    tls_config: Any | None = None,
     enable_metering: bool = True,
     db_path: str = "bedrock.db",
-) -> HTTPServer:
-    """Create and configure the Bedrock Core API server.
+) -> FastAPI:
+    """Create and configure the Bedrock Core API application.
 
-    Args:
-        host: Bind address.
-        port: Bind port.
-        config: Core configuration (loaded from env if not provided).
-        api_keys: Dict of api_key -> {tier, node_id, roles}.
-        tls_config: TLS configuration. If None, auto-configured:
-            - Development: generates self-signed certs
-            - Production: requires BEDROCK_TLS_CERT and BEDROCK_TLS_KEY env vars
-        enable_metering: Whether to enable usage metering and rate limiting.
-        db_path: Path to the SQLite database for persistence.
+    Returns a FastAPI app instance. For backward compatibility, this
+    function has the same signature as the old http.server version.
+
+    Use run_server() to start serving with uvicorn.
     """
-    from bedrock.metering import UsageMeter
-
-    BedrockAPIHandler.config = config or CoreConfig.from_env()
-    BedrockAPIHandler.api_keys = api_keys or {}
-    BedrockAPIHandler.usage_meter = UsageMeter() if enable_metering else None
-    BedrockAPIHandler.persistent = PersistentBedrock(storage=SQLiteBackend(db_path))
-    BedrockAPIHandler.persistent.restore_all()
-
-    server = HTTPServer((host, port), BedrockAPIHandler)
-
-    # Apply TLS if configured
-    if tls_config is None:
-        # Auto-configure: dev mode gets self-signed, prod requires env vars
-        effective_config = BedrockAPIHandler.config
-        assert effective_config is not None  # Set above
-        if effective_config.environment == "development":
-            tls_config = TLSConfig.for_development()
-        else:
-            tls_config = TLSConfig.from_env()
-
-    if tls_config and tls_config.enabled:
-        wrap_server_with_tls(server, tls_config)
-        scheme = "https"
-    else:
-        scheme = "http"
-
-    print(f"Bedrock Core API server created on {scheme}://{host}:{port}")
-    print(f"TLS: {'enabled' if (tls_config and tls_config.enabled) else 'disabled'}")
-    if tls_config and tls_config.enabled:
-        print(f"TLS version: {tls_config.min_version.name} - {tls_config.max_version.name}")
-
-    return server
+    app = create_app(
+        config=config,
+        api_keys=api_keys,
+        tls_config=tls_config,
+        enable_metering=enable_metering,
+        db_path=db_path,
+    )
+    # Store bind info for run_server
+    app.state.host = host
+    app.state.port = port
+    app.state.tls_config = tls_config
+    return app
 
 
 def run_server(
@@ -727,23 +563,50 @@ def run_server(
     port: int = 8443,
     config: CoreConfig | None = None,
     api_keys: dict[str, dict] | None = None,
-    tls_config: TLSConfig | None = None,
+    tls_config: Any | None = None,
     enable_metering: bool = True,
     db_path: str = "bedrock.db",
 ) -> None:
-    """Run the Bedrock Core API server."""
-    server = create_server(host, port, config, api_keys, tls_config, enable_metering, db_path)
-    effective_config = BedrockAPIHandler.config
-    assert effective_config is not None  # Set by create_server
-    metering_status = "enabled" if BedrockAPIHandler.usage_meter else "disabled"
-    print(f"Environment: {effective_config.environment}")
-    print(f"Tier: {effective_config.licensing.tier}")
-    print(f"Usage metering: {metering_status}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-        server.server_close()
+    """Run the Bedrock Core API server with uvicorn.
+
+    This is the production-grade server entry point. It uses uvicorn
+    with proper connection handling, timeouts, and graceful shutdown.
+    """
+    import uvicorn
+
+    app = create_server(host, port, config, api_keys, tls_config, enable_metering, db_path)
+
+    effective_config = config or CoreConfig.from_env()
+
+    # Determine TLS settings
+    if tls_config is None:
+        if effective_config.environment == "development":
+            tls_config = TLSConfig.for_development()
+        else:
+            tls_config = TLSConfig.from_env()
+
+    ssl_kwargs: dict[str, Any] = {}
+    if tls_config and tls_config.enabled:
+        from bedrock.server.tls import create_ssl_context
+
+        ssl_kwargs["ssl"] = create_ssl_context(tls_config)
+        scheme = "https"
+    else:
+        scheme = "http"
+
+    print(f"Starting Bedrock Core API server on {scheme}://{host}:{port}")
+    print(f"TLS: {'enabled' if (tls_config and tls_config.enabled) else 'disabled'}")
+    if tls_config and tls_config.enabled:
+        print(f"TLS version: {tls_config.min_version.name} - {tls_config.max_version.name}")
+
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        timeout_keep_alive=30,
+        **ssl_kwargs,
+    )
 
 
 if __name__ == "__main__":

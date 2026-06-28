@@ -12,7 +12,7 @@ import ssl
 import subprocess
 import tempfile
 from datetime import UTC, datetime, timedelta
-from http.server import HTTPServer
+from typing import Any
 
 
 class TLSConfig:
@@ -356,14 +356,20 @@ def validate_cert_pair(cert_file: str, key_file: str) -> dict:
     return {"valid": True, "cert_info": cert_info, "errors": []}
 
 
-def wrap_server_with_tls(server: HTTPServer, tls_config: TLSConfig) -> HTTPServer:
-    """Wrap an HTTPServer socket with TLS.
+def wrap_server_with_tls(server: Any, tls_config: TLSConfig) -> Any:
+    """Apply TLS configuration to a server.
 
-    Modifies the server in-place to use TLS. Call before server_forever().
+    For the FastAPI/uvicorn server, TLS is handled by uvicorn directly
+    via ssl_context in run_server(). This function is kept for backward
+    compatibility but does not modify the server — use create_ssl_context()
+    and pass the result to uvicorn.run() instead.
     """
     if not tls_config.enabled:
         return server
 
-    ctx = create_ssl_context(tls_config)
-    server.socket = ctx.wrap_socket(server.socket, server_side=True)
+    # For http.server-based servers, wrap the socket
+    if hasattr(server, "socket"):
+        ctx = create_ssl_context(tls_config)
+        server.socket = ctx.wrap_socket(server.socket, server_side=True)
+
     return server

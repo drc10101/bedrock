@@ -61,7 +61,7 @@ Your app makes normal SDK calls — register a node, create a silo, encrypt a fi
 
 ## Status
 
-Bedrock v0.3 is an active development release. Core modules (crypto, identity, data separation, licensing) are well-tested (841 tests, zero type errors). The HTTP API server has SQLite persistence and works for development and testing, but is not yet hardened for production traffic. See [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for the roadmap.
+Bedrock v0.3 is an active development release. Core modules (crypto, identity, data separation, licensing) are well-tested (857 tests, zero type errors). The API server runs on FastAPI + uvicorn — production-grade connection handling, request timeouts, graceful shutdown, and per-tier rate limiting. See [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for deployment details.
 
 ## Quick Start
 

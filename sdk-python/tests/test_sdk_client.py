@@ -30,15 +30,17 @@ from bedrock.config import CoreConfig
 
 
 class _TestServer:
-    """In-process HTTP server for testing."""
+    """In-process uvicorn server for testing."""
 
     def __init__(self, port=19879):
         self.port = port
-        self.server = None
+        self.app = None
         self.thread = None
         self.test_api_key = "test-sdk-key-12345"
 
     def start(self):
+        import uvicorn
+
         config = CoreConfig(environment="test", debug=True)
         api_keys = {
             self.test_api_key: {
@@ -47,21 +49,30 @@ class _TestServer:
                 "roles": ["patient", "provider"],
             }
         }
-        self.server = create_server(
+        self.app = create_server(
             host="127.0.0.1",
             port=self.port,
             config=config,
             api_keys=api_keys,
-            tls_config=TLSConfig(enabled=False),  # No TLS for test client
+            tls_config=TLSConfig(enabled=False),
             db_path=":memory:",
         )
-        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread = threading.Thread(
+            target=uvicorn.run,
+            kwargs={
+                "app": self.app,
+                "host": "127.0.0.1",
+                "port": self.port,
+                "log_level": "warning",
+            },
+            daemon=True,
+        )
         self.thread.start()
-        time.sleep(0.2)
+        time.sleep(0.5)
 
     def stop(self):
-        if self.server:
-            self.server.shutdown()
+        # uvicorn in daemon thread will exit when process exits
+        pass
 
     @property
     def url(self):

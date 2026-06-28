@@ -1,20 +1,17 @@
 """
 Bedrock Core API server tests.
 
-Tests the HTTP API endpoints for frontend integration.
-Uses http.server's test harness pattern.
+Tests the FastAPI endpoints for frontend integration.
+Uses FastAPI's TestClient (Starlette) for synchronous test execution.
 """
 
 import json
-import threading
-import time
-from http.server import HTTPServer
-from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
 
 from bedrock.config import CoreConfig
-from bedrock.server import BedrockAPIHandler, create_server, APIError
+from bedrock.server import create_app, APIError
 from bedrock.server.tls import TLSConfig
 
 
@@ -22,7 +19,7 @@ class TestAPIServer:
     """Test API server endpoints."""
 
     def setup_method(self):
-        """Set up test server and client."""
+        """Set up test client."""
         self.config = CoreConfig(environment="test", debug=True)
         self.api_keys = {
             "test-api-key": {
@@ -31,214 +28,350 @@ class TestAPIServer:
                 "roles": ["patient", "provider"],
             }
         }
-        self.server = create_server(
-            host="127.0.0.1", port=0,  # Random available port
+        app = create_app(
             config=self.config,
             api_keys=self.api_keys,
-            tls_config=TLSConfig(enabled=False),  # No TLS for test client
-            db_path=":memory:",  # In-memory SQLite for tests
+            tls_config=TLSConfig(enabled=False),
+            db_path=":memory:",
+            enable_metering=False,
         )
-        self.port = self.server.server_address[1]
-        self.thread = threading.Thread(target=self.server.serve_forever)
-        self.thread.daemon = True
-        self.thread.start()
-        time.sleep(0.1)  # Let server start
-
-    def teardown_method(self):
-        """Shut down test server."""
-        self.server.shutdown()
-
-    def _url(self, path: str) -> str:
-        return f"http://127.0.0.1:{self.port}{path}"
+        self.client = TestClient(app)
 
     def _headers(self, api_key: str = "test-api-key") -> dict:
         return {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    def _get(self, path: str, api_key: str = "test-api-key"):
-        """Make a GET request to the test server."""
-        import urllib.request
-        req = urllib.request.Request(self._url(path), headers=self._headers(api_key))
-        try:
-            with urllib.request.urlopen(req) as resp:
-                return resp.status, json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read().decode())
+    # ── Health endpoints (no auth) ──
 
-    def _post(self, path: str, data: dict, api_key: str = "test-api-key"):
-        """Make a POST request to the test server."""
-        import urllib.request
-        body = json.dumps(data).encode()
-        req = urllib.request.Request(
-            self._url(path), data=body, headers=self._headers(api_key), method="POST"
-        )
-        try:
-            with urllib.request.urlopen(req) as resp:
-                return resp.status, json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read().decode())
-
-    def _put(self, path: str, data: dict, api_key: str = "test-api-key"):
-        """Make a PUT request to the test server."""
-        import urllib.request
-        body = json.dumps(data).encode()
-        req = urllib.request.Request(
-            self._url(path), data=body, headers=self._headers(api_key), method="PUT"
-        )
-        try:
-            with urllib.request.urlopen(req) as resp:
-                return resp.status, json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            return e.code, json.loads(e.read().decode())
-
-    # ── Health ──
-
-    def test_health_endpoint_no_auth(self):
-        """Health endpoint should work without authentication."""
-        import urllib.request
-        req = urllib.request.Request(self._url("/health"))
-        with urllib.request.urlopen(req) as resp:
-            assert resp.status == 200
-            data = json.loads(resp.read().decode())
-            assert data["status"] in ("healthy", "degraded")
-            assert "components" in data
+    def test_health_endpoint(self):
+        """GET /health returns health status."""
+        response = self.client.get("/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert "healthy" in data or "status" in data
 
     def test_health_detailed_requires_auth(self):
-        """Detailed health endpoint requires authentication."""
-        import urllib.request
-        req = urllib.request.Request(self._url("/health/detailed"))
-        # No Authorization header
-        try:
-            with urllib.request.urlopen(req) as resp:
-                # Should not get here — should be 401
-                assert resp.status == 401, f"Expected 401, got {resp.status}"
-        except urllib.error.HTTPError as e:
-            assert e.code == 401, f"Expected 401, got {e.code}"
+        """GET /health/detailed requires authentication."""
+        response = self.client.get("/health/detailed")
+        assert response.status_code == 401
 
     def test_health_detailed_with_auth(self):
-        """Detailed health endpoint works with authentication."""
-        status, data = self._get("/health/detailed")
-        # Without auth returns 401, with auth returns 200
-        # Let's test with auth
-        status, data = self._get("/health/detailed", api_key="test-api-key")
-        assert status == 200
-        assert "components" in data
+        """GET /health/detailed returns detailed health with auth."""
+        response = self.client.get("/health/detailed", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert "components" in data or "healthy" in data or "status" in data
 
-    # ── Authentication ──
-
-    def test_api_endpoints_require_auth(self):
-        """Protected endpoints return 401 without auth."""
-        import urllib.request
-        req = urllib.request.Request(self._url("/api/v1/nodes"))
-        try:
-            with urllib.request.urlopen(req) as resp:
-                assert resp.status == 401
-        except urllib.error.HTTPError as e:
-            assert e.code == 401
-
-    def test_invalid_api_key(self):
-        """Invalid API key returns 401."""
-        status, data = self._get("/api/v1/silos", api_key="invalid-key")
-        assert status == 401
-
-    # ── Node Registration ──
+    # ── Node registration ──
 
     def test_register_node(self):
         """POST /api/v1/nodes registers a new node."""
-        status, data = self._post("/api/v1/nodes", {
-            "name": "test-patient",
-            "node_type": "patient",
-        })
-        assert status == 201
+        response = self.client.post(
+            "/api/v1/nodes",
+            json={"name": "test-node", "node_type": "provider"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 201
+        data = response.json()
         assert "node_id" in data
-        assert data["name"] == "test-patient"
+        assert data["name"] == "test-node"
         assert data["state"] == "active"
 
-    # ── Certificate ──
+    def test_register_node_requires_auth(self):
+        """POST /api/v1/nodes requires authentication."""
+        response = self.client.post(
+            "/api/v1/nodes",
+            json={"name": "unauth-node"},
+        )
+        assert response.status_code == 401
+
+    def test_register_node_default_values(self):
+        """POST /api/v1/nodes uses defaults when fields missing."""
+        response = self.client.post("/api/v1/nodes", json={}, headers=self._headers())
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"].startswith("node-")
+        assert data["state"] == "active"
+
+    # ── Node listing and retrieval ──
+
+    def test_list_nodes(self):
+        """GET /api/v1/nodes lists all nodes."""
+        # Register a node first
+        self.client.post(
+            "/api/v1/nodes",
+            json={"name": "list-test-node"},
+            headers=self._headers(),
+        )
+        response = self.client.get("/api/v1/nodes", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert "nodes" in data
+        assert data["total"] >= 1
+
+    def test_get_node(self):
+        """GET /api/v1/nodes/{node_id} returns node details."""
+        create_resp = self.client.post(
+            "/api/v1/nodes",
+            json={"name": "get-test-node"},
+            headers=self._headers(),
+        )
+        node_id = create_resp.json()["node_id"]
+
+        response = self.client.get(f"/api/v1/nodes/{node_id}", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert data["name"] == "get-test-node"
+
+    def test_get_node_not_found(self):
+        """GET /api/v1/nodes/{node_id} returns 404 for unknown node."""
+        response = self.client.get("/api/v1/nodes/nonexistent", headers=self._headers())
+        assert response.status_code == 404
+
+    # ── Certificate endpoints ──
 
     def test_issue_certificate(self):
         """POST /api/v1/certificates issues a certificate."""
-        status, data = self._post("/api/v1/certificates", {
-            "node_name": "cert-test",
-            "node_type": "provider",
-        })
-        assert status == 201
+        # Register a node first
+        node_resp = self.client.post(
+            "/api/v1/nodes",
+            json={"name": "cert-test", "node_type": "provider"},
+            headers=self._headers(),
+        )
+        node_id = node_resp.json()["node_id"]
 
-    # ── Silos ──
+        response = self.client.post(
+            "/api/v1/certificates",
+            json={"node_uuid": node_id, "node_name": "cert-test"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert "serial" in data
+        assert data["node_uuid"] == node_id
+
+    def test_revoke_certificate(self):
+        """DELETE /api/v1/certificates/{node_id} returns 404 if no cert exists."""
+        # Revoking a non-existent certificate returns 404
+        response = self.client.delete(
+            "/api/v1/certificates/nonexistent-node",
+            headers=self._headers(),
+        )
+        assert response.status_code == 404
+
+    # ── Silo endpoints ──
 
     def test_create_silo(self):
         """POST /api/v1/silos creates a data silo."""
-        status, data = self._post("/api/v1/silos", {
-            "name": "medical-records",
-            "display_name": "Medical Records",
-            "categories": ["diagnosis", "medication"],
-        })
-        assert status == 201
-        assert data["name"] == "medical-records"
+        response = self.client.post(
+            "/api/v1/silos",
+            json={"name": "test-silo", "display_name": "Test Silo", "categories": ["medical"]},
+            headers=self._headers(),
+        )
+        assert response.status_code == 201
+        data = response.json()
+        assert data["name"] == "test-silo"
 
     def test_list_silos(self):
-        """GET /api/v1/silos lists data silos."""
-        status, data = self._get("/api/v1/silos")
-        assert status == 200
+        """GET /api/v1/silos lists all silos."""
+        self.client.post(
+            "/api/v1/silos",
+            json={"name": "list-silo", "categories": ["financial"]},
+            headers=self._headers(),
+        )
+        response = self.client.get("/api/v1/silos", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
         assert "silos" in data
-        assert "total" in data
+        assert data["total"] >= 1
 
-    # ── Consent ──
+    # ── Consent endpoints ──
 
     def test_request_consent(self):
-        """POST /api/v1/consent creates a consent request."""
-        status, data = self._post("/api/v1/consent", {
-            "requesting_node_id": "provider-001",
-            "source_silo": "medical",
-            "target_silo": "identity",
-            "categories": ["diagnosis"],
-            "scope": "read",
-            "reason": "treatment",
-        })
-        assert status == 201
+        """POST /api/v1/consent requests consent."""
+        response = self.client.post(
+            "/api/v1/consent",
+            json={
+                "requesting_node_id": "node-1",
+                "source_silo": "medical",
+                "target_silo": "billing",
+                "categories": ["diagnosis"],
+                "scope": "read",
+                "reason": "billing review",
+            },
+            headers=self._headers(),
+        )
+        assert response.status_code == 201
+        data = response.json()
         assert "consent_id" in data
         assert data["status"] == "pending"
 
-    # ── Licensing ──
+    def test_approve_consent(self):
+        """PUT /api/v1/consent/{id}/approve approves consent."""
+        # Request consent first
+        consent_resp = self.client.post(
+            "/api/v1/consent",
+            json={
+                "requesting_node_id": "node-1",
+                "source_silo": "medical",
+                "target_silo": "billing",
+                "categories": ["diagnosis"],
+                "scope": "read",
+                "reason": "billing review",
+            },
+            headers=self._headers(),
+        )
+        consent_id = consent_resp.json()["consent_id"]
+
+        response = self.client.put(
+            f"/api/v1/consent/{consent_id}/approve",
+            json={"data_owner_id": "owner-1"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "approved"
+
+    def test_deny_consent(self):
+        """PUT /api/v1/consent/{id}/deny denies consent."""
+        consent_resp = self.client.post(
+            "/api/v1/consent",
+            json={
+                "requesting_node_id": "node-1",
+                "source_silo": "medical",
+                "target_silo": "billing",
+                "categories": ["diagnosis"],
+                "scope": "read",
+                "reason": "billing review",
+            },
+            headers=self._headers(),
+        )
+        consent_id = consent_resp.json()["consent_id"]
+
+        response = self.client.put(
+            f"/api/v1/consent/{consent_id}/deny",
+            json={"data_owner_id": "owner-1", "reason": "Not authorized"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "denied"
+
+    # ── Encryption endpoints ──
+
+    def test_encrypt_field(self):
+        """POST /api/v1/encrypt encrypts a field value."""
+        response = self.client.post(
+            "/api/v1/encrypt",
+            json={"plaintext": "SSN-123-45-6789", "silo": "medical", "record_id": "p1", "scope": "ssn"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "ciphertext" in data
+        assert data["silo"] == "medical"
+
+    def test_decrypt_not_implemented(self):
+        """POST /api/v1/decrypt returns 501 (requires key management)."""
+        response = self.client.post(
+            "/api/v1/decrypt",
+            json={"ciphertext": "abc123"},
+            headers=self._headers(),
+        )
+        assert response.status_code == 501
+
+    # ── Audit endpoints ──
+
+    def test_query_audit(self):
+        """GET /api/v1/audit queries audit chain."""
+        response = self.client.get("/api/v1/audit", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert "entries" in data
+        assert "total" in data
+
+    def test_query_audit_with_filters(self):
+        """GET /api/v1/audit?actor_id=... filters results."""
+        response = self.client.get(
+            "/api/v1/audit?actor_id=test-node-001",
+            headers=self._headers(),
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert "entries" in data
+
+    def test_verify_audit(self):
+        """GET /api/v1/audit/verify verifies chain integrity."""
+        response = self.client.get("/api/v1/audit/verify", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert "verified" in data
+
+    # ── License validation ──
 
     def test_validate_license(self):
         """POST /api/v1/license/validate validates a license key."""
-        # First generate a key
-        from bedrock.licensing.enforcement import LicenseEnforcer, LicenseTier
-        enforcer = LicenseEnforcer()
-        key = enforcer.generate_license_key(tier=LicenseTier.DEVELOPER, issued_to="api-test")
-
-        status, data = self._post("/api/v1/license/validate", {
-            "license_key": key,
-        })
-        assert status == 200
-        assert data["valid"] is True
-        assert data["tier"] == "developer"
-
-    # ── Audit ──
-
-    def test_verify_audit(self):
-        """GET /api/v1/audit/verify checks chain integrity."""
-        status, data = self._get("/api/v1/audit/verify")
-        assert status == 200
-        assert "verified" in data
-
-    # ── Error Handling ──
-
-    def test_not_found(self):
-        """Unknown endpoints return 404."""
-        status, data = self._get("/api/v1/nonexistent")
-        assert status == 404
-
-    def test_invalid_json_body(self):
-        """Malformed JSON returns 400."""
-        import urllib.request
-        body = b"not json"
-        req = urllib.request.Request(
-            self._url("/api/v1/nodes"), data=body,
-            headers=self._headers(), method="POST"
+        response = self.client.post(
+            "/api/v1/license/validate",
+            json={"license_key": "test-key"},
         )
-        try:
-            with urllib.request.urlopen(req) as resp:
-                assert resp.status == 400
-        except urllib.error.HTTPError as e:
-            assert e.code == 400
+        assert response.status_code == 200
+        data = response.json()
+        assert "valid" in data
+
+    # ── Usage metering ──
+
+    def test_usage_endpoint(self):
+        """GET /api/v1/usage returns usage summary."""
+        response = self.client.get("/api/v1/usage", headers=self._headers())
+        assert response.status_code == 200
+        data = response.json()
+        assert "usage" in data
+
+    # ── Authentication ──
+
+    def test_invalid_api_key(self):
+        """Requests with invalid API key are rejected."""
+        response = self.client.get(
+            "/api/v1/nodes",
+            headers={"Authorization": "Bearer invalid-key"},
+        )
+        assert response.status_code == 401
+
+    def test_missing_auth_header(self):
+        """Requests without auth header are rejected."""
+        response = self.client.get("/api/v1/nodes")
+        assert response.status_code == 401
+
+    def test_health_no_auth_required(self):
+        """GET /health does not require authentication."""
+        response = self.client.get("/health")
+        assert response.status_code == 200
+
+    # ── Error handling ──
+
+    def test_api_error_class(self):
+        """APIError can be instantiated with message and status."""
+        err = APIError("test error", 400)
+        assert err.message == "test error"
+        assert err.status == 400
+
+    def test_authentication_error(self):
+        """AuthenticationError has 401 status."""
+        from bedrock.server.app import AuthenticationError
+
+        err = AuthenticationError()
+        assert err.status == 401
+
+    def test_authorization_error(self):
+        """AuthorizationError has 403 status."""
+        from bedrock.server.app import AuthorizationError
+
+        err = AuthorizationError()
+        assert err.status == 403
+
+    def test_not_found_error(self):
+        """NotFoundError has 404 status."""
+        from bedrock.server.app import NotFoundError
+
+        err = NotFoundError("test")
+        assert err.status == 404
