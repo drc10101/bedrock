@@ -27,7 +27,7 @@ jobs:
           pip install -e "core[dev,stripe]"
 
       - name: Run tests
-        run: pytest tests/ -k "not test_generate_format" --tb=short -q
+        run: pytest tests/ --tb=short -q
 
   test-sdk-python:
     runs-on: ubuntu-latest
