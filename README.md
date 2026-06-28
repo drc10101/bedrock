@@ -2,10 +2,11 @@
   <img src="assets/Bedrock_Logo.png" alt="Bedrock" width="600">
 </p>
 
-<h3 align="center">Identity-based security framework</h3>
+<h3 align="center">Build your app. Inherit the security.</h3>
 
 <p align="center">
-  Every node is a user. Everything between is encrypted at rest.
+  Bedrock is the security layer your app sits on top of.<br>
+  Identity, encryption, consent, and audit — handled from the start.
 </p>
 
 <p align="center">
@@ -18,19 +19,47 @@
 
 ---
 
-Bedrock provides the foundational security layer for applications that handle sensitive data — healthcare, finance, defense, and beyond. It enforces identity at every endpoint, encrypts all data at rest, and gates every cross-silo access through cryptographic consent.
+**You don't bolt security on after the fact. You build on Bedrock, and your app inherits it.**
 
-## Core Principles
+Bedrock is a security framework that your application calls into — not a service you route traffic through. When your app uses Bedrock's SDK, every node gets a cryptographic identity, every field write gets encrypted at rest, every cross-silo read requires cryptographic consent, and every action gets written to a tamper-evident audit chain. Your app focuses on business logic. Bedrock handles the security guarantees.
 
-- **Every node is a user.** Each compute endpoint has a cryptographic identity.
-- **Encrypted at rest, always.** Data exists in cleartext only at the consuming endpoint, only for the minimum time required.
-- **Consent-gated access.** No cross-silo data access without cryptographic proof of consent.
-- **Audit everything.** SHA-256 hash chain — tamper-evident, tamper-resistant.
-- **Self-hosted first.** No Bedrock-operated infrastructure required.
+## What Your App Gets
+
+- **Cryptographic identity for every node.** Each service, device, or user in your system gets a signed identity. No anonymous access.
+- **Field-level encryption at rest.** Data is encrypted before it hits storage. Siloed by category — medical records, financial data, PII — each in its own encrypted container.
+- **Consent-gated data access.** No cross-silo read without a cryptographic consent token. If the patient didn't authorize it, the data doesn't move.
+- **Tamper-evident audit chain.** Every write, read, consent grant, and revocation is SHA-256 chained. Detect tampering, prove compliance.
+- **Self-healing mesh transport.** Encrypted node-to-node communication with automatic failover and reconnection.
+- **License-gated operation.** Runtime enforcement of tier limits — nodes, certificates, features.
+
+Your app calls the SDK. The SDK calls Bedrock Core. The security is there because you built on Bedrock, not because you remembered to add it later.
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    Your Application                   │
+│                                                       │
+│   Business logic, routes, UI — whatever you build     │
+│                                                       │
+├──────────┬──────────┬──────────────────────────────┤
+│  Python  │TypeScript│          REST API              │
+│   SDK    │   SDK    │                                │
+├──────────┴──────────┴──────────────────────────────┤
+│                                                       │
+│                  Bedrock Core                         │
+│                                                       │
+│   You inherit: identity, encryption, consent,         │
+│   audit, key management, mesh transport               │
+│                                                       │
+└─────────────────────────────────────────────────────┘
+```
+
+Your app makes normal SDK calls — register a node, create a silo, encrypt a field, request consent. Bedrock handles the cryptography, the key derivation, the consent verification, the audit logging. You never touch raw crypto. You never write your own access control. You build on top, and the security is already there.
 
 ## Status
 
-Bedrock v0.3 is an active development release. The core crypto, identity, data separation, and licensing modules are well-tested (841 tests passing, zero type errors). The HTTP API server has SQLite persistence and works for development and testing, but is not yet hardened for production traffic (uses stdlib HTTPServer, no request timeouts, no graceful shutdown). See [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for the roadmap.
+Bedrock v0.3 is an active development release. Core modules (crypto, identity, data separation, licensing) are well-tested (841 tests, zero type errors). The HTTP API server has SQLite persistence and works for development and testing, but is not yet hardened for production traffic. See [PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) for the roadmap.
 
 ## Quick Start
 
@@ -61,6 +90,64 @@ pytest
 docker compose -f deploy/docker-compose.yml up
 ```
 
+## Use It In Your App
+
+### Python
+
+```python
+from bedrock_sdk import BedrockClient
+
+client = BedrockClient(
+    base_url="https://bedrock.example.com",
+    license_key="1:...",
+)
+
+# Register your service as a node — it now has a cryptographic identity
+node = client.nodes.register(name="my-service", node_type="application")
+
+# Create a data silo — medical records live here, encrypted at rest
+silo = client.silos.create(
+    name="patient-records",
+    display_name="Patient Records",
+    categories=["medical", "phi"],
+)
+
+# Encrypt a field before storing it — Bedrock handles key derivation
+ciphertext = client.encryption.encrypt(
+    plaintext="SSN-123-45-6789",
+    silo=silo.silo_id,
+    record_id="patient-001",
+    scope="ssn",
+    operation="store",
+)
+
+# Request consent before reading cross-silo data — cryptographic proof required
+consent = client.consent.request(
+    requester_id=node.node_id,
+    target_id="patient-001",
+    silo_id=silo.silo_id,
+    purpose="treatment",
+    scope=["ssn", "diagnosis"],
+)
+```
+
+### TypeScript
+
+```typescript
+import { BedrockClient } from "@infill/bedrock-sdk";
+
+const client = new BedrockClient({
+  baseUrl: "https://bedrock.example.com",
+  licenseKey: "1:...",
+});
+
+// Same API surface as Python SDK
+const node = await client.nodes.register({ name: "my-service" });
+const silo = await client.silos.create({ name: "patient-records" });
+```
+
+That's it. Your app now has identity, encryption, consent, and audit — because it's built on Bedrock.
+
 ## CLI Commands
 
 | Command | Description |
@@ -74,26 +161,6 @@ docker compose -f deploy/docker-compose.yml up
 | `bedrock license revoke --key-id` | Revoke a signing key |
 | `bedrock health [--json]` | Run health checks |
 | `bedrock status` | Show system status and config |
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                    Application                       │
-├──────────┬──────────┬──────────┬────────────────────┤
-│  Python  │TypeScript│   CLI    │     REST API       │
-│   SDK    │   SDK    │ bedrock  │  (FastAPI/uvicorn) │
-├──────────┴──────────┴──────────┴────────────────────┤
-│                  Bedrock Core                        │
-├──────────┬──────────┬──────────┬──────────┬─────────┤
-│Encryption│  Identity │   Data   │  Access  │  Audit  │
-│  Engine  │  Fabric   │ Silos    │ Control  │  Chain  │
-├──────────┴──────────┴──────────┴──────────┴─────────┤
-│              Key Management (HKDF)                   │
-├─────────────────────────────────────────────────────┤
-│           Self-Healing Mesh Transport                │
-└─────────────────────────────────────────────────────┘
-```
 
 ## Licensing
 
@@ -123,65 +190,9 @@ bedrock trial --licensee "your-email@example.com"
 ### How It Works
 
 1. `bedrock trial` — get a free 30-day license with full developer features
-2. Evaluate Bedrock locally — self-signed certs, 3 nodes, all APIs
+2. Build your app on Bedrock — identity, encryption, consent, audit are inherited
 3. When ready for production, purchase a runtime license at [bedrock.dev/pricing](https://bedrock.dev/pricing)
 4. Upgrade your license key — no code changes, no reinstallation
-
-## SDKs
-
-### Python
-
-```python
-from bedrock_sdk import BedrockClient
-
-client = BedrockClient(
-    base_url="https://bedrock.example.com",
-    license_key="1:...",
-)
-
-# Register a node
-node = client.nodes.register(name="my-service", node_type="application")
-
-# Create a data silo
-silo = client.silos.create(
-    name="patient-records",
-    display_name="Patient Records",
-    categories=["medical", "phi"],
-)
-
-# Encrypt a field
-ciphertext = client.encryption.encrypt(
-    plaintext="SSN-123-45-6789",
-    silo=silo.silo_id,
-    record_id="patient-001",
-    scope="ssn",
-    operation="store",
-)
-
-# Request consent for cross-silo access
-consent = client.consent.request(
-    requester_id=node.node_id,
-    target_id="patient-001",
-    silo_id=silo.silo_id,
-    purpose="treatment",
-    scope=["ssn", "diagnosis"],
-)
-```
-
-### TypeScript
-
-```typescript
-import { BedrockClient } from "@infill/bedrock-sdk";
-
-const client = new BedrockClient({
-  baseUrl: "https://bedrock.example.com",
-  licenseKey: "1:...",
-});
-
-// Same API surface as Python SDK
-const node = await client.nodes.register({ name: "my-service" });
-const silo = await client.silos.create({ name: "patient-records" });
-```
 
 ## Testing
 
@@ -196,7 +207,7 @@ cd sdk-python && pytest
 cd sdk-ts && npm test
 ```
 
-All 930 tests pass: 788 core + 20 Python SDK + 122 TypeScript SDK.
+841 tests pass across core modules (841) and Python SDK (20). Zero type errors.
 
 ## Security
 
@@ -206,7 +217,7 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 ## License
 
-This software is licensed under the [Business Source License 1.1](LICENSE). 
+This software is licensed under the [Business Source License 1.1](LICENSE).
 
 You may use, modify, and redistribute this software for non-production purposes (development, testing, evaluation) free of charge. Production use requires a paid license — see [bedrock.dev/pricing](https://bedrock.dev/pricing).
 
