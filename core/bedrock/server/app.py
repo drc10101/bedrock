@@ -15,6 +15,7 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 import time
 import uuid
@@ -204,9 +205,7 @@ def create_app(
         # Rate limit: 1 registration per minute per IP
         now = time.time()
         client_ip = request.client.host if request.client else "unknown"
-        _registration_timestamps[:] = [
-            t for t in _registration_timestamps if now - t < 3600
-        ]
+        _registration_timestamps[:] = [t for t in _registration_timestamps if now - t < 3600]
         recent = sum(1 for t in _registration_timestamps if now - t < 60)
         if recent >= 1:
             raise HTTPException(
@@ -215,11 +214,9 @@ def create_app(
             )
         _registration_timestamps.append(now)
 
-        body = {}
-        try:
-            body = await request.json()
-        except Exception:
-            body = {}
+        # Accept optional JSON body but don't require it
+        with contextlib.suppress(Exception):
+            await request.json()
 
         # Generate a secure API key
         api_key = secrets.token_urlsafe(32)
@@ -234,8 +231,9 @@ def create_app(
             "roles": roles,
         }
 
-        # Persist the key if persistence is available
-        try:
+        # Persist the key if persistence is available (non-critical:
+        # key works in memory even if persist fails)
+        with contextlib.suppress(Exception):
             persistent.save_api_key(
                 {
                     "key": api_key,
@@ -246,8 +244,6 @@ def create_app(
                     "source_ip": client_ip,
                 }
             )
-        except Exception:
-            pass  # Non-critical: key works in memory even if persist fails
 
         return {
             "api_key": api_key,
