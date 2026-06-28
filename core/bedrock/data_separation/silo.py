@@ -61,7 +61,7 @@ class SiloManager:
     piece of data belongs to exactly one silo.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._silos: dict[str, Silo] = {}
 
     def create_silo(

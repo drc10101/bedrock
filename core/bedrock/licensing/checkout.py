@@ -21,6 +21,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
 
 import stripe
 
@@ -57,13 +58,12 @@ class LicenseDelivery:
     issued_at: float = field(default_factory=time.time)
 
 
-def configure_stripe():
+def configure_stripe() -> None:
     """Configure the Stripe SDK from environment variables."""
     secret_key = os.environ.get("BEDROCK_STRIPE_SECRET_KEY")
     if not secret_key:
         raise ValueError("BEDROCK_STRIPE_SECRET_KEY environment variable is required")
     stripe.api_key = secret_key
-    return stripe
 
 
 def create_checkout_session(
@@ -102,38 +102,37 @@ def create_checkout_session(
     product_id = os.environ.get("BEDROCK_STRIPE_PRODUCT_ID")
 
     # Build line items
-    line_items = [{"price": price_id, "quantity": 1}]
+    line_items: list[dict[str, Any]] = [{"price": price_id, "quantity": 1}]
 
-    # Build session params
-    params = {
+    # Build metadata
+    session_metadata: dict[str, str] = {"bedrock_tier": tier.value}
+    if metadata:
+        session_metadata.update(metadata)
+    if product_id:
+        session_metadata["product_id"] = product_id
+
+    create_kwargs: dict[str, Any] = {
         "mode": "subscription" if tier == CheckoutTier.DEVELOPER_TEAM else "payment",
         "line_items": line_items,
         "success_url": success_url,
         "cancel_url": cancel_url,
-        "metadata": {
-            "bedrock_tier": tier.value,
-            **(metadata or {}),
-        },
+        "metadata": session_metadata,
     }
-
     if customer_email:
-        params["customer_email"] = customer_email
+        create_kwargs["customer_email"] = customer_email
 
-    if product_id:
-        params["metadata"]["product_id"] = product_id
-
-    session = stripe.checkout.Session.create(**params)
+    session = stripe.checkout.Session.create(**create_kwargs)
 
     return CheckoutResult(
         session_id=session.id,
-        session_url=session.url,
+        session_url=session.url or "",
         tier=tier,
         price_id=price_id,
         customer_email=customer_email,
     )
 
 
-def verify_webhook_signature(payload: bytes, sig_header: str) -> dict:
+def verify_webhook_signature(payload: bytes, sig_header: str) -> dict[str, Any]:
     """Verify and parse a Stripe webhook event.
 
     Args:
@@ -151,7 +150,7 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> dict:
         raise ValueError("BEDROCK_STRIPE_WEBHOOK_SECRET environment variable is required")
 
     event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-    return event
+    return dict(event)
 
 
 def handle_checkout_completed(event: dict) -> LicenseDelivery:
@@ -208,7 +207,7 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
     )
 
 
-def create_pricing_links() -> dict:
+def create_pricing_links() -> dict[str, str]:
     """Generate Stripe payment links for all license tiers.
 
     Returns a dict mapping tier names to Stripe payment links.
@@ -216,7 +215,7 @@ def create_pricing_links() -> dict:
     """
     configure_stripe()
 
-    links = {}
+    links: dict[str, str] = {}
 
     price_config = {
         "developer_individual": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"),
@@ -234,7 +233,7 @@ def create_pricing_links() -> dict:
                 cancel_url="https://bedrock.dev/license/cancel",
                 metadata={"bedrock_tier": tier_name},
             )
-            links[tier_name] = session.url
+            links[tier_name] = session.url or ""
         except stripe.error.StripeError as e:
             links[tier_name] = f"Error: {str(e)}"
 

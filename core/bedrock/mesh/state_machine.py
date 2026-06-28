@@ -14,7 +14,7 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 from datetime import UTC, datetime
 
-from bedrock.identity.node import Node, NodeState
+from bedrock.identity.node import Node, NodeID, NodeState
 
 
 class TransitionRecord:
@@ -60,7 +60,7 @@ class MeshStateMachine:
         NodeState.REVOKED: [],  # Terminal state
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._transition_history: list[TransitionRecord] = []
 
     def transition(self, node: Node, new_state: NodeState, reason: str = "") -> Node:
@@ -90,7 +90,7 @@ class MeshStateMachine:
         node.state = new_state
 
         record = TransitionRecord(
-            node_id=node.node_id,
+            node_id=node.node_id.uuid,
             from_state=from_state,
             to_state=new_state,
             reason=reason,
@@ -140,15 +140,17 @@ class MeshStateMachine:
 
         return True
 
-    def get_transition_history(self, node_id: str | None = None) -> list[TransitionRecord]:
+    def get_transition_history(self, node_id: NodeID | str | None = None) -> list[TransitionRecord]:
         """Get transition history, optionally filtered by node_id."""
         if node_id:
-            return [r for r in self._transition_history if r.node_id == node_id]
+            key = node_id.uuid if isinstance(node_id, NodeID) else node_id
+            return [r for r in self._transition_history if r.node_id == key]
         return list(self._transition_history)
 
-    def get_last_transition(self, node_id: str) -> TransitionRecord | None:
+    def get_last_transition(self, node_id: NodeID | str) -> TransitionRecord | None:
         """Get the most recent transition for a node."""
+        key = node_id.uuid if isinstance(node_id, NodeID) else node_id
         for record in reversed(self._transition_history):
-            if record.node_id == node_id:
+            if record.node_id == key:
                 return record
         return None

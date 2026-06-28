@@ -14,7 +14,7 @@ from datetime import datetime
 from bedrock.audit.chain import AuditChain, AuditEntry
 from bedrock.data_separation.consent import ConsentEvent, ConsentGate
 from bedrock.data_separation.silo import Silo, SiloManager
-from bedrock.identity.certificates import CertificateManager
+from bedrock.identity.certificates import CertificateManager, LicenseTier
 from bedrock.identity.registration import Node, NodeRegistry
 from bedrock.licensing.keygen import LicenseKeygen, SigningKey
 from bedrock.storage.sqlite_backend import SQLiteBackend
@@ -53,14 +53,14 @@ class PersistentBedrock:
         self.storage = storage or SQLiteBackend("bedrock.db")
 
         self.registry = registry or NodeRegistry()
-        self.cert_manager = cert_manager or CertificateManager(license_tier="enterprise")
+        self.cert_manager = cert_manager or CertificateManager(license_tier=LicenseTier.ENTERPRISE)
         self.silo_manager = silo_manager or SiloManager()
         self.consent_gate = consent_gate or ConsentGate()
         self.audit_chain = audit_chain or AuditChain()
         self.keygen = keygen or LicenseKeygen()
 
     @staticmethod
-    def _dt_to_str(dt) -> str:
+    def _dt_to_str(dt: datetime | str) -> str:
         """Convert datetime to ISO string for JSON serialization."""
         if isinstance(dt, datetime):
             return dt.isoformat()
@@ -170,7 +170,7 @@ class PersistentBedrock:
         saved = self.storage.load_silos()
         count = 0
         for _silo_id, data in saved.items():
-            if self.silo_manager._silos.get(data.get("name")) is not None:
+            if self.silo_manager._silos.get(data.get("name", "")) is not None:
                 continue
             try:
                 self.silo_manager.create_silo(

@@ -30,11 +30,11 @@ class MasterKey:
     """Master key metadata. The actual key material is never stored in code."""
 
     key_id: str  # Unique identifier
-    created_at: datetime = None
+    created_at: datetime | None = None
     version: int = 1
     source: str = "env"  # "env", "hsm", "file"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now(UTC)
 
@@ -46,10 +46,10 @@ class SiloKey:
     silo_name: str  # e.g., "medical", "identity"
     version: int  # Key version (incremented on rotation)
     hkdf_info: str  # e.g., "bedrock:silo:medical:v1"
-    created_at: datetime = None
+    created_at: datetime | None = None
     parent_key_id: str = ""  # Master key that derived this key
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.created_at is None:
             self.created_at = datetime.now(UTC)
 
@@ -68,7 +68,7 @@ class KeyManager:
     3. Key rotation is just incrementing the version number
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: object | None = None) -> None:
         self._config = config
         # Cache of derived keys: (master_key_hash, silo_name, version) -> bytes
         # We hash the master key to use as part of the cache key so different

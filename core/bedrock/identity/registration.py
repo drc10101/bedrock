@@ -50,7 +50,7 @@ class NodeRegistry:
     This implementation uses in-memory storage for the core library.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._nodes: dict[str, Node] = {}  # uuid -> Node
         self._public_keys: dict[bytes, str] = {}  # public_key -> uuid (enforce uniqueness)
         self._names: dict[str, str] = {}  # name -> uuid (enforce uniqueness)

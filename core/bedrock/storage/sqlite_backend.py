@@ -20,6 +20,8 @@ import json
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
+from typing import cast
 
 
 class SQLiteBackend:
@@ -60,7 +62,7 @@ class SQLiteBackend:
             conn.execute("PRAGMA foreign_keys=ON")
             conn.row_factory = sqlite3.Row
             self._local.conn = conn
-        return self._local.conn
+        return cast(sqlite3.Connection, self._local.conn)
 
     def _ensure_table(self, table: str) -> None:
         """Create the table if it doesn't exist (lazy migration)."""
@@ -113,7 +115,7 @@ class SQLiteBackend:
         row = conn.execute(f"SELECT data FROM {table} WHERE key = ?", (key,)).fetchone()
         if row is None:
             return None
-        return json.loads(row["data"])
+        return cast(dict, json.loads(row["data"]))
 
     def load_all(self, table: str) -> dict[str, dict]:
         """Load all records from a table.
@@ -143,7 +145,7 @@ class SQLiteBackend:
         self._ensure_table(table)
         conn = self._get_conn()
         row = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}").fetchone()
-        return row["cnt"]
+        return cast(int, row["cnt"])
 
     def exists(self, table: str, key: str) -> bool:
         """Check if a record exists."""
@@ -152,7 +154,7 @@ class SQLiteBackend:
         row = conn.execute(f"SELECT 1 FROM {table} WHERE key = ?", (key,)).fetchone()
         return row is not None
 
-    def query(self, table: str, filter_fn=None) -> dict[str, dict]:
+    def query(self, table: str, filter_fn: Callable[[dict], bool] | None = None) -> dict[str, dict]:
         """Load records with an optional filter function.
 
         Args:
@@ -198,10 +200,12 @@ class SQLiteBackend:
             self._local.conn.close()
             self._local.conn = None
 
-    def __enter__(self):
+    def __enter__(self) -> "SQLiteBackend":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: type | None, exc_val: BaseException | None, exc_tb: object | None
+    ) -> None:
         self.close()
 
     # --- Module-specific convenience methods ---

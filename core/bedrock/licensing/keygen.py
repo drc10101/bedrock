@@ -38,7 +38,7 @@ class SigningKey:
     revoked: bool = False
     revocation_reason: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.created_at:
             self.created_at = time.time()
         if isinstance(self.key_material, str):
@@ -98,7 +98,7 @@ class LicenseKeygen:
         )
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._keys: dict[str, SigningKey] = {}
 
     def generate_signing_key(

@@ -27,6 +27,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric.ec import (
     ECDH,
     SECP256R1,
+    EllipticCurvePrivateKey,
+    EllipticCurvePublicKey,
     generate_private_key,
 )
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -312,7 +314,7 @@ class E2EEDeliverer:
     4. Decrypt with that key + AAD
     """
 
-    def __init__(self, config=None):
+    def __init__(self, config: object | None = None) -> None:
         self._config = config
 
     def encrypt_for_recipient(
@@ -351,11 +353,19 @@ class E2EEDeliverer:
         aad_bytes = aad_string.encode("utf-8")
 
         # Load recipient's public key
-        recipient_pub = serialization.load_der_public_key(recipient_public_key)
+        recipient_pub_raw = serialization.load_der_public_key(recipient_public_key)
+        if not isinstance(recipient_pub_raw, EllipticCurvePublicKey):
+            raise TypeError("Recipient public key must be an elliptic curve key for ECDH")
+        recipient_pub = recipient_pub_raw
 
         # Generate ephemeral key pair (or use provided sender key)
         if sender_private_key is not None:
-            ephemeral_priv = serialization.load_der_private_key(sender_private_key, password=None)
+            ephemeral_priv_raw = serialization.load_der_private_key(
+                sender_private_key, password=None
+            )
+            if not isinstance(ephemeral_priv_raw, EllipticCurvePrivateKey):
+                raise TypeError("Sender private key must be an elliptic curve key for ECDH")
+            ephemeral_priv = ephemeral_priv_raw
         else:
             ephemeral_priv = generate_private_key(SECP256R1())
         ephemeral_pub = ephemeral_priv.public_key()
@@ -403,7 +413,7 @@ class E2EEDeliverer:
         self,
         ciphertext: str,
         sender_public_key: bytes | None = None,
-        recipient_private_key: bytes = None,
+        recipient_private_key: bytes | None = None,
         aad: AAD | None = None,
         silo: str = "",
         record_id: str = "",
@@ -426,6 +436,9 @@ class E2EEDeliverer:
         Returns:
             Decrypted plaintext string
         """
+        if recipient_private_key is None:
+            raise ValueError("recipient_private_key is required for E2EE decryption")
+
         # Strip version prefix
         encoded = ciphertext[len(CiphertextFormat.V2_GCM.value) :]
 
@@ -478,8 +491,16 @@ class E2EEDeliverer:
         aad_bytes = aad_string.encode("utf-8")
 
         # Load keys
-        ephemeral_pub = serialization.load_der_public_key(ephemeral_pub_bytes)
-        recipient_priv = serialization.load_der_private_key(recipient_private_key, password=None)
+        ephemeral_pub_raw = serialization.load_der_public_key(ephemeral_pub_bytes)
+        if not isinstance(ephemeral_pub_raw, EllipticCurvePublicKey):
+            raise TypeError("Ephemeral public key must be an elliptic curve key for ECDH")
+        ephemeral_pub = ephemeral_pub_raw
+        recipient_priv_raw = serialization.load_der_private_key(
+            recipient_private_key, password=None
+        )
+        if not isinstance(recipient_priv_raw, EllipticCurvePrivateKey):
+            raise TypeError("Recipient private key must be an elliptic curve key for ECDH")
+        recipient_priv = recipient_priv_raw
 
         # ECDH key agreement (same shared secret)
         shared_key = recipient_priv.exchange(ECDH(), ephemeral_pub)
@@ -544,7 +565,9 @@ class EncryptionEngine:
         pt = engine.e2ee.decrypt_from_sender(ct, recipient_private_key=priv_b)
     """
 
-    def __init__(self, key_manager: KeyManager, master_key: bytes, config=None):
+    def __init__(
+        self, key_manager: KeyManager, master_key: bytes, config: object | None = None
+    ) -> None:
         self._key_manager = key_manager
         self._master_key = master_key
         self._config = config

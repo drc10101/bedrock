@@ -246,7 +246,7 @@ class AccessController:
     logged to the audit chain.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._users: dict[str, UserAccount] = {}  # username -> UserAccount
         self._sessions: dict[str, Session] = {}  # session_id -> Session
 

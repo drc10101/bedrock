@@ -28,10 +28,14 @@ SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 
 import base64
 import struct
+from typing import TYPE_CHECKING
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
 
 # InFill's HKDF info string — must match security.py exactly
 _INFILL_HKDF_INFO = b"infill-field-encryption-aes256gcm"
@@ -60,7 +64,7 @@ class LegacyDecryptor:
     def __init__(self, base_key: bytes):
         self._base_key = base_key
         self._aesgcm_key: bytes | None = None
-        self._fernet = None
+        self._fernet: Fernet | None = None
 
     def _derive_aes256_key(self) -> bytes:
         """Derive AES-256 key from base key via HKDF-SHA256.
@@ -78,7 +82,7 @@ class LegacyDecryptor:
             self._aesgcm_key = hkdf.derive(self._base_key)
         return self._aesgcm_key
 
-    def _get_fernet(self):
+    def _get_fernet(self) -> Fernet:
         """Get Fernet cipher instance for legacy decryption."""
         if self._fernet is None:
             from cryptography.fernet import Fernet
@@ -116,7 +120,7 @@ class LegacyDecryptor:
     def _decrypt_fernet(self, ciphertext: str) -> str:
         """Decrypt legacy Fernet format: gAAAA..."""
         f = self._get_fernet()
-        return f.decrypt(ciphertext.encode("ascii")).decode("utf-8")
+        return str(f.decrypt(ciphertext.encode("ascii")).decode("utf-8"))
 
     def is_legacy(self, ciphertext: str) -> bool:
         """Check if ciphertext is a legacy format (not Bedrock v2 with AAD).

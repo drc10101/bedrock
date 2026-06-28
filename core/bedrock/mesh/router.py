@@ -29,7 +29,7 @@ class MeshRouter:
     5. Quarantined and REVOKED nodes are excluded from all routing
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._topology: dict[str, set[str]] = {}  # node_id -> {neighbor_ids}
         self._scopes: dict[str, CapabilityScope] = {}  # node_id -> scope
 

@@ -92,7 +92,7 @@ class ConsentGate:
     Every state transition is audit-logged in production.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._events: dict[str, ConsentEvent] = {}
 
     def request_consent(

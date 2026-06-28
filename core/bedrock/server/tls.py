@@ -12,6 +12,7 @@ import ssl
 import subprocess
 import tempfile
 from datetime import UTC, datetime, timedelta
+from http.server import HTTPServer
 
 
 class TLSConfig:
@@ -355,7 +356,7 @@ def validate_cert_pair(cert_file: str, key_file: str) -> dict:
     return {"valid": True, "cert_info": cert_info, "errors": []}
 
 
-def wrap_server_with_tls(server, tls_config: TLSConfig):
+def wrap_server_with_tls(server: HTTPServer, tls_config: TLSConfig) -> HTTPServer:
     """Wrap an HTTPServer socket with TLS.
 
     Modifies the server in-place to use TLS. Call before server_forever().

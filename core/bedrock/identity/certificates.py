@@ -46,8 +46,8 @@ class CertificateStatus(Enum):
     PENDING_RENEWAL = "pending_renewal"
 
 
-# Node limits per license tier
-NODE_LIMITS = {
+# Node limits per license tier (LicenseTier | str keys for robust enum lookups)
+NODE_LIMITS: dict[LicenseTier | str, float] = {
     LicenseTier.DEVELOPER: 3,
     LicenseTier.STARTER: 5,
     LicenseTier.BUSINESS: 25,
@@ -55,7 +55,8 @@ NODE_LIMITS = {
 }
 # String-key fallbacks for enum identity robustness under pytest
 for _tier in list(NODE_LIMITS):
-    NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
+    if isinstance(_tier, LicenseTier):
+        NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
 
 
 @dataclass

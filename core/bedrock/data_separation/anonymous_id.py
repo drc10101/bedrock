@@ -1540,7 +1540,7 @@ class IDMappingTable:
     - Compromising one silo's data reveals nothing about other silos
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # real_id -> {silo_name: anonymous_id}
         self._mappings: dict[str, dict[str, str]] = {}
         # reverse lookup: anonymous_id -> (real_id, silo_name)

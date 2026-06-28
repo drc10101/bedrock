@@ -163,7 +163,7 @@ class AuditChain:
     Export: JSONL format for compliance reporting (HIPAA, SOC 2, PCI-DSS).
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._chain: list[AuditEntry] = []
         self._last_hash: str = GENESIS_HASH
 

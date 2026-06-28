@@ -13,16 +13,22 @@ Security model:
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
+from __future__ import annotations
+
 import json
 import time
 import uuid
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlparse
 
 from bedrock.config import CoreConfig
 from bedrock.health import HealthChecker
 from bedrock.server.tls import TLSConfig, wrap_server_with_tls
+
+if TYPE_CHECKING:
+    from bedrock.metering import UsageMeter
 
 
 class APIError(Exception):
@@ -53,11 +59,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
     """HTTP request handler for Bedrock Core API."""
 
     # Config and core modules — set by server before serving
-    config: CoreConfig = None
+    config: CoreConfig | None = None
     api_keys: dict[str, dict] = {}  # api_key -> {tier, node_id, roles}
-    usage_meter = None  # Set by create_server
+    usage_meter: UsageMeter | None = None  # Set by create_server
 
-    def log_message(self, fmt, *args):
+    def log_message(self, fmt: str, *args: Any) -> None:
         """Override to use structured logging."""
         if self.config and self.config.log_format == "json":
             print(
@@ -74,7 +80,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         else:
             super().log_message(fmt, *args)
 
-    def _send_json(self, data: Any, status: int = 200):
+    def _send_json(self, data: Any, status: int = 200) -> None:
         """Send JSON response with rate limit headers."""
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -82,7 +88,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
         # Add rate limit headers if metering is enabled
         if self.usage_meter and hasattr(self, "_auth_key"):
-            rl_status = self.usage_meter.get_rate_limit_status(self._auth_key)
+            rl_status = self.usage_meter.get_rate_limit_status(str(self._auth_key))
             self.send_header(
                 "X-RateLimit-Minute-Remaining", str(rl_status.get("minute_remaining", 0))
             )
@@ -93,11 +99,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             json.dumps(data, indent=2 if self.config and self.config.debug else None).encode()
         )
 
-    def _send_error(self, message: str, status: int = 400):
+    def _send_error(self, message: str, status: int = 400) -> None:
         """Send error response."""
         self._send_json({"error": message, "status": status}, status)
 
-    def _authenticate(self) -> dict | None:
+    def _authenticate(self) -> dict[str, Any] | None:
         """Validate API key from Authorization header."""
         auth_header = self.headers.get("Authorization", "")
         if auth_header.startswith("Bearer ") or auth_header.startswith("ApiKey "):
@@ -109,22 +115,23 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             return self.api_keys[api_key]
         return None
 
-    def _require_auth(self) -> dict:
+    def _require_auth(self) -> dict[str, Any]:
         """Require authentication, raise 401 if missing."""
         identity = self._authenticate()
         if identity is None:
             raise AuthenticationError()
         return identity
 
-    def _parse_body(self) -> dict:
+    def _parse_body(self) -> dict[str, Any]:
         """Parse JSON request body."""
         content_length = int(self.headers.get("Content-Length", 0))
         if content_length == 0:
             return {}
         body = self.rfile.read(content_length)
-        return json.loads(body)
+        result: dict[str, Any] = json.loads(body)
+        return result
 
-    def _route(self, method: str, path: str) -> tuple[callable, dict]:
+    def _route(self, method: str, path: str) -> tuple[Callable[..., Any], dict[str, str]]:
         """Route request to handler. Returns (handler_fn, path_params)."""
         routes = {
             # Health (no auth required)
@@ -180,19 +187,19 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── HTTP Methods ──
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         self._handle_request("GET")
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         self._handle_request("POST")
 
-    def do_PUT(self):
+    def do_PUT(self) -> None:
         self._handle_request("PUT")
 
-    def do_DELETE(self):
+    def do_DELETE(self) -> None:
         self._handle_request("DELETE")
 
-    def _handle_request(self, method: str):
+    def _handle_request(self, method: str) -> None:
         """Route and execute request with rate limiting, metering, and error handling."""
         parsed = urlparse(self.path)
         path = parsed.path
@@ -245,14 +252,14 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Health Endpoints (no auth) ──
 
-    def _handle_health(self):
+    def _handle_health(self) -> None:
         """GET /health — Basic health check."""
         checker = HealthChecker(self.config)
         report = checker.check()
         status = 200 if report.is_healthy() else 503
         self._send_json(report.to_dict(), status)
 
-    def _handle_health_detailed(self):
+    def _handle_health_detailed(self) -> None:
         """GET /health/detailed — Detailed component health."""
         self._require_auth()
         checker = HealthChecker(self.config)
@@ -261,7 +268,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Identity Endpoints ──
 
-    def _handle_register_node(self):
+    def _handle_register_node(self) -> None:
         """POST /api/v1/nodes — Register a new node."""
         self._require_auth()
         body = self._parse_body()
@@ -283,18 +290,18 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             201,
         )
 
-    def _handle_list_nodes(self):
+    def _handle_list_nodes(self) -> None:
         """GET /api/v1/nodes — List all nodes."""
         self._require_auth()
         # NodeRegistry doesn't persist — return empty for now
         self._send_json({"nodes": [], "total": 0})
 
-    def _handle_get_node(self, node_id: str = ""):
+    def _handle_get_node(self, node_id: str = "") -> None:
         """GET /api/v1/nodes/{node_id} — Get node details."""
         self._require_auth()
         self._send_error("Node not found", 404)
 
-    def _handle_issue_certificate(self):
+    def _handle_issue_certificate(self) -> None:
         """POST /api/v1/certificates — Issue a certificate."""
         self._require_auth()
         body = self._parse_body()
@@ -329,20 +336,20 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
                 ),
                 "issued_at": (
                     cert.issued_at.isoformat()
-                    if hasattr(cert.issued_at, "isoformat")
-                    else str(cert.issued_at)
+                    if hasattr(cert.issued_at, "isoformat") and cert.issued_at is not None
+                    else str(cert.issued_at) if cert.issued_at is not None else ""
                 ),
                 "expires_at": (
                     cert.expires_at.isoformat()
-                    if hasattr(cert.expires_at, "isoformat")
-                    else str(cert.expires_at)
+                    if hasattr(cert.expires_at, "isoformat") and cert.expires_at is not None
+                    else str(cert.expires_at) if cert.expires_at is not None else ""
                 ),
                 "capabilities": cert.capabilities,
             },
             201,
         )
 
-    def _handle_revoke_certificate(self, node_id: str = ""):
+    def _handle_revoke_certificate(self, node_id: str = "") -> None:
         """DELETE /api/v1/certificates/{node_id} — Revoke certificate."""
         self._require_auth()
 
@@ -355,7 +362,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Data Separation Endpoints ──
 
-    def _handle_create_silo(self):
+    def _handle_create_silo(self) -> None:
         """POST /api/v1/silos — Create a data silo."""
         self._require_auth()
         body = self._parse_body()
@@ -378,7 +385,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             201,
         )
 
-    def _handle_list_silos(self):
+    def _handle_list_silos(self) -> None:
         """GET /api/v1/silos — List all silos."""
         self._require_auth()
 
@@ -396,7 +403,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Consent Endpoints ──
 
-    def _handle_request_consent(self):
+    def _handle_request_consent(self) -> None:
         """POST /api/v1/consent — Request consent."""
         identity = self._require_auth()
         body = self._parse_body()
@@ -421,7 +428,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             201,
         )
 
-    def _handle_approve_consent(self, consent_id: str = ""):
+    def _handle_approve_consent(self, consent_id: str = "") -> None:
         """PUT /api/v1/consent/{consent_id}/approve — Approve consent."""
         identity = self._require_auth()
         body = self._parse_body()
@@ -441,7 +448,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             }
         )
 
-    def _handle_deny_consent(self, consent_id: str = ""):
+    def _handle_deny_consent(self, consent_id: str = "") -> None:
         """PUT /api/v1/consent/{consent_id}/deny — Deny consent."""
         identity = self._require_auth()
         body = self._parse_body()
@@ -464,7 +471,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Encryption Endpoints ──
 
-    def _handle_encrypt(self):
+    def _handle_encrypt(self) -> None:
         """POST /api/v1/encrypt — Encrypt field data."""
         self._require_auth()
         body = self._parse_body()
@@ -493,7 +500,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             200,
         )
 
-    def _handle_decrypt(self):
+    def _handle_decrypt(self) -> None:
         """POST /api/v1/decrypt — Decrypt field data."""
         self._require_auth()
         self._parse_body()
@@ -504,7 +511,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Audit Endpoints ──
 
-    def _handle_query_audit(self):
+    def _handle_query_audit(self) -> None:
         """GET /api/v1/audit — Query audit chain."""
         self._require_auth()
         parsed = urlparse(self.path)
@@ -534,7 +541,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
             }
         )
 
-    def _handle_verify_audit(self):
+    def _handle_verify_audit(self) -> None:
         """GET /api/v1/audit/verify — Verify audit chain integrity."""
         self._require_auth()
 
@@ -547,7 +554,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Licensing Endpoint ──
 
-    def _handle_validate_license(self):
+    def _handle_validate_license(self) -> None:
         """POST /api/v1/license/validate — Validate a license key."""
         body = self._parse_body()
 
@@ -567,7 +574,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
 
     # ── Usage Metering Endpoint ──
 
-    def _handle_usage(self):
+    def _handle_usage(self) -> None:
         """GET /api/v1/usage — Get usage summary for authenticated key."""
         identity = self._require_auth()
         parsed = urlparse(self.path)
@@ -635,6 +642,7 @@ def create_server(
     if tls_config is None:
         # Auto-configure: dev mode gets self-signed, prod requires env vars
         effective_config = BedrockAPIHandler.config
+        assert effective_config is not None  # Set above
         if effective_config.environment == "development":
             tls_config = TLSConfig.for_development()
         else:
@@ -661,10 +669,11 @@ def run_server(
     api_keys: dict[str, dict] | None = None,
     tls_config: TLSConfig | None = None,
     enable_metering: bool = True,
-):
+) -> None:
     """Run the Bedrock Core API server."""
     server = create_server(host, port, config, api_keys, tls_config, enable_metering)
     effective_config = BedrockAPIHandler.config
+    assert effective_config is not None  # Set by create_server
     metering_status = "enabled" if BedrockAPIHandler.usage_meter else "disabled"
     print(f"Environment: {effective_config.environment}")
     print(f"Tier: {effective_config.licensing.tier}")

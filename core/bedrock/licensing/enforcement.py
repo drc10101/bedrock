@@ -43,8 +43,8 @@ class LicenseTier(Enum):
     ENTERPRISE = "enterprise"
 
 
-# Node limits per license tier
-NODE_LIMITS = {
+# Node limits per license tier (LicenseTier | str keys for robust enum lookups)
+NODE_LIMITS: dict[LicenseTier | str, float] = {
     LicenseTier.TRIAL: 3,
     LicenseTier.DEVELOPER: 3,
     LicenseTier.STARTER: 5,
@@ -53,7 +53,7 @@ NODE_LIMITS = {
 }
 
 # Pricing per tier (annual USD)
-TIER_PRICING = {
+TIER_PRICING: dict[LicenseTier | str, int | dict[str, int] | str] = {
     LicenseTier.TRIAL: 0,  # Free 30-day trial
     LicenseTier.DEVELOPER: {"individual": 99, "team": 499},
     LicenseTier.STARTER: 5000,
@@ -73,8 +73,8 @@ STRIPE_PRICES = {
     },
 }
 
-# Feature flags per tier
-TIER_FEATURES = {
+# Feature flags per tier (LicenseTier | str keys for robust enum lookups)
+TIER_FEATURES: dict[LicenseTier | str, list[str]] = {
     LicenseTier.TRIAL: [
         "self_signed_certs",
         "localhost_only",
@@ -127,11 +127,14 @@ TIER_FEATURES = {
 # Add string-key fallbacks for enum identity robustness across import paths
 # (Under pytest, enum identity may differ; string lookups always work)
 for _tier in list(NODE_LIMITS):
-    NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
+    if isinstance(_tier, LicenseTier):
+        NODE_LIMITS[_tier.value] = NODE_LIMITS[_tier]
 for _tier in list(TIER_PRICING):
-    TIER_PRICING[_tier.value] = TIER_PRICING[_tier]
+    if isinstance(_tier, LicenseTier):
+        TIER_PRICING[_tier.value] = TIER_PRICING[_tier]
 for _tier in list(TIER_FEATURES):
-    TIER_FEATURES[_tier.value] = TIER_FEATURES[_tier]
+    if isinstance(_tier, LicenseTier):
+        TIER_FEATURES[_tier.value] = TIER_FEATURES[_tier]
 
 
 @dataclass

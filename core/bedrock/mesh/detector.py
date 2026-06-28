@@ -46,7 +46,7 @@ class DetectionSignal:
     details: dict = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.details is None:
             self.details = {}
 
@@ -71,7 +71,7 @@ class AttackDetector:
     """
 
     # Default detection thresholds
-    DEFAULT_THRESHOLDS = {
+    DEFAULT_THRESHOLDS: dict[SignalType, dict[str, int | float]] = {
         SignalType.CREDENTIAL_STUFFING: {"max_failures": 5, "window_seconds": 60},
         SignalType.LATERAL_MOVEMENT: {"max_scope_violations": 1},
         SignalType.UNUSUAL_VOLUME: {"stddev_threshold": 3.0},
@@ -84,7 +84,7 @@ class AttackDetector:
 
     def __init__(self, node_id: str, thresholds: dict[SignalType, dict] | None = None):
         self.node_id = node_id
-        self.thresholds = thresholds or dict(self.DEFAULT_THRESHOLDS)
+        self.thresholds = thresholds or self.DEFAULT_THRESHOLDS.copy()
         self._signals: list[DetectionSignal] = []
 
     def detect(

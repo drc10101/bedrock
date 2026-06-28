@@ -30,7 +30,7 @@ from bedrock.licensing.keygen import LicenseKeygen
 VERSION = "0.3.0"
 
 
-def cmd_init(args):
+def cmd_init(args: argparse.Namespace) -> int:
     """Initialize a new Bedrock project directory."""
     project_dir = Path(args.directory).resolve()
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -134,7 +134,7 @@ BEDROCK_MASTER_KEY=<from data/keys/master.key>
     return 0
 
 
-def cmd_serve(args):
+def cmd_serve(args: argparse.Namespace) -> int:
     """Start the Bedrock API server."""
     from bedrock.server.app import run_server
     from bedrock.server.tls import TLSConfig
@@ -173,7 +173,7 @@ def cmd_serve(args):
     return 0
 
 
-def cmd_keygen(args):
+def cmd_keygen(args: argparse.Namespace) -> int:
     """Generate a new signing key."""
     keygen = _load_keygen(args)
 
@@ -192,7 +192,7 @@ def cmd_keygen(args):
     return 0
 
 
-def cmd_license(args):
+def cmd_license(args: argparse.Namespace) -> int:
     """License management commands."""
     if args.license_action == "issue":
         return _license_issue(args)
@@ -207,7 +207,7 @@ def cmd_license(args):
         return 1
 
 
-def _license_issue(args):
+def _license_issue(args: argparse.Namespace) -> int:
     """Issue a new license key."""
     keygen = _load_keygen(args)
 
@@ -256,7 +256,7 @@ def _license_issue(args):
     return 0
 
 
-def _license_validate(args):
+def _license_validate(args: argparse.Namespace) -> int:
     """Validate a license key."""
     from bedrock.licensing.enforcement import LicenseValidationError
 
@@ -273,7 +273,7 @@ def _license_validate(args):
                 print(
                     f"  Features: {', '.join(license_obj.features) if isinstance(license_obj.features, list) else license_obj.features}"
                 )
-            if license_obj.is_expired():
+            if license_obj.is_expired:
                 print("  WARNING: License has expired")
             return 0
         else:
@@ -286,7 +286,7 @@ def _license_validate(args):
         return 1
 
 
-def _license_revoke(args):
+def _license_revoke(args: argparse.Namespace) -> int:
     """Revoke a signing key."""
     keygen = _load_keygen(args)
     success = keygen.revoke_key(args.key_id, reason=args.reason or "Manual revocation")
@@ -301,7 +301,7 @@ def _license_revoke(args):
         return 1
 
 
-def _license_info(args):
+def _license_info(args: argparse.Namespace) -> int:
     """Show info about a license key (parse without full validation)."""
     parts = args.key.split(":")
     if len(parts) >= 2:
@@ -313,7 +313,7 @@ def _license_info(args):
     return 0
 
 
-def cmd_health(args):
+def cmd_health(args: argparse.Namespace) -> int:
     """Run health checks."""
     config = CoreConfig.from_env()
     checker = HealthChecker(config)
@@ -327,9 +327,6 @@ def cmd_health(args):
     for name, status in report.components.items():
         icon = "+" if status.healthy else "X"
         print(f"  [{icon}] {name}: {status.message}")
-        if not status.healthy and status.details:
-            for key, value in status.details.items():
-                print(f"      {key}: {value}")
 
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
@@ -337,7 +334,7 @@ def cmd_health(args):
     return 0 if report.is_healthy() else 1
 
 
-def cmd_status(args):
+def cmd_status(args: argparse.Namespace) -> int:
     """Show system status and configuration summary."""
     config = CoreConfig.from_env()
 
@@ -381,7 +378,7 @@ def cmd_status(args):
     return 0
 
 
-def cmd_trial(args):
+def cmd_trial(args: argparse.Namespace) -> int:
     """Generate a free 30-day trial license key."""
     enforcer = LicenseEnforcer()
     license_key = enforcer.issue_trial_license(issued_to=args.licensee)
@@ -403,7 +400,7 @@ def cmd_trial(args):
     return 0
 
 
-def cmd_checkout(args):
+def cmd_checkout(args: argparse.Namespace) -> int:
     """Create a Stripe checkout session for a paid license."""
     from bedrock.licensing.checkout import CheckoutTier, create_checkout_session
 
@@ -440,7 +437,7 @@ def cmd_checkout(args):
     return 0
 
 
-def cmd_webhook(args):
+def cmd_webhook(args: argparse.Namespace) -> int:
     """Start the Stripe webhook server for license delivery."""
     from bedrock.licensing.webhook import run_webhook_server
 
@@ -457,7 +454,7 @@ def cmd_webhook(args):
     return 0
 
 
-def _load_keygen(args):
+def _load_keygen(args: argparse.Namespace) -> LicenseKeygen:
     """Load LicenseKeygen with existing keys or create new."""
     keys_path = Path(args.keys_file) if args.keys_file else Path("data/keys/signing_keys.json")
 
@@ -469,7 +466,7 @@ def _load_keygen(args):
         return LicenseKeygen()
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
     parser = argparse.ArgumentParser(
         prog="bedrock",
@@ -580,7 +577,7 @@ def build_parser():
     return parser
 
 
-def main():
+def main() -> int:
     """Main CLI entry point."""
     parser = build_parser()
     args = parser.parse_args()
@@ -590,7 +587,7 @@ def main():
         return 1
 
     try:
-        return args.func(args)
+        return int(args.func(args))
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130

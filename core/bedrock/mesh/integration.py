@@ -332,7 +332,7 @@ class MeshIntegrator:
 
         Returns list of events generated.
         """
-        events = []
+        events: list[MeshEvent] = []
         node = self.mesh.get_node(node_id)
 
         if node is None:

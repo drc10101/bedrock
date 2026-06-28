@@ -24,6 +24,11 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from bedrock.encryption.engine import FieldEncryptor
+    from bedrock.key_management.keys import KeyManager
 
 
 class RotationTrigger(Enum):
@@ -106,7 +111,9 @@ class KeyRotationManager:
             rotator.rotate_master_key(trigger=RotationTrigger.SCHEDULED)
     """
 
-    def __init__(self, key_manager, master_key: bytes, policy: RotationPolicy | None = None):
+    def __init__(
+        self, key_manager: "KeyManager", master_key: bytes, policy: RotationPolicy | None = None
+    ) -> None:
         self._key_manager = key_manager
         self._active_master_key = master_key
         self._policy = policy or RotationPolicy()
@@ -277,7 +284,7 @@ class KeyRotationManager:
 
         return new_key, new_record
 
-    def _enforce_grace_limit(self):
+    def _enforce_grace_limit(self) -> None:
         """Retire oldest grace keys beyond the max_grace_keys limit."""
         grace_records = [r for r in self._records if r.state == KeyState.GRACE]
         while len(grace_records) > self._policy.max_grace_keys:
@@ -285,7 +292,7 @@ class KeyRotationManager:
             self._retire_key(oldest.key_id)
             grace_records.remove(oldest)
 
-    def _retire_key(self, key_id: str):
+    def _retire_key(self, key_id: str) -> None:
         """Retire a grace-period key, removing its material from memory."""
         for r in self._records:
             if r.key_id == key_id and r.state == KeyState.GRACE:
@@ -295,7 +302,7 @@ class KeyRotationManager:
         # Destroy key material
         self._key_history.pop(key_id, None)
 
-    def revoke_key(self, key_id: str):
+    def revoke_key(self, key_id: str) -> None:
         """Emergency revoke a key. Key material is immediately destroyed.
 
         This should only be used when a key is known to be compromised.
@@ -341,8 +348,8 @@ class KeyRotationManager:
             # Check if we need a grace-period key
             # First try deriving from the active key
             try:
-                return self._key_manager.derive_silo_key(
-                    self._active_master_key, silo_name, version
+                return bytes(
+                    self._key_manager.derive_silo_key(self._active_master_key, silo_name, version)
                 )
             except Exception:
                 pass
@@ -350,7 +357,9 @@ class KeyRotationManager:
             # Check grace keys
             for _key_id, key_material in self.get_grace_keys():
                 try:
-                    return self._key_manager.derive_silo_key(key_material, silo_name, version)
+                    return bytes(
+                        self._key_manager.derive_silo_key(key_material, silo_name, version)
+                    )
                 except Exception:
                     continue
 
@@ -359,11 +368,11 @@ class KeyRotationManager:
                 "The key may have been retired or revoked."
             )
 
-        return self._key_manager.get_silo_key(self._active_master_key, silo_name)
+        return bytes(self._key_manager.get_silo_key(self._active_master_key, silo_name))
 
     def re_encrypt_field(
         self,
-        field_encryptor,
+        field_encryptor: "FieldEncryptor",
         ciphertext: str,
         silo: str,
         record_id: str,
@@ -399,7 +408,7 @@ class KeyRotationManager:
                 try:
                     plaintext = candidate.decrypt(ciphertext, silo, record_id, scope)
                     # Found the right grace key
-                    new_ciphertext = field_encryptor.encrypt(plaintext, silo, record_id, scope)
+                    new_ciphertext = str(field_encryptor.encrypt(plaintext, silo, record_id, scope))
                     return new_ciphertext
                 except ValueError:
                     continue
@@ -409,8 +418,10 @@ class KeyRotationManager:
             )
 
         # Decrypt with old key, encrypt with new key
+        if decrypt_fe is None:
+            raise ValueError("No decryptor available for re-encryption")
         plaintext = decrypt_fe.decrypt(ciphertext, silo, record_id, scope)
-        new_ciphertext = field_encryptor.encrypt(plaintext, silo, record_id, scope)
+        new_ciphertext = str(field_encryptor.encrypt(plaintext, silo, record_id, scope))
 
         return new_ciphertext
 

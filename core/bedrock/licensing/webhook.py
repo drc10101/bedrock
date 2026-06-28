@@ -26,6 +26,7 @@ from email.mime.text import MIMEText
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from bedrock.licensing.checkout import (
+    LicenseDelivery,
     handle_checkout_completed,
     verify_webhook_signature,
 )
@@ -34,10 +35,10 @@ from bedrock.licensing.checkout import (
 class WebhookHandler(BaseHTTPRequestHandler):
     """HTTP handler for Stripe webhook events."""
 
-    def log_message(self, fmt, *args):
+    def log_message(self, fmt: str, *args: object) -> None:
         print(f"[webhook] {time.strftime('%Y-%m-%d %H:%M:%S')} {fmt % args}")
 
-    def do_POST(self):
+    def do_POST(self) -> None:
         if self.path != "/webhook/stripe":
             self.send_response(404)
             self.end_headers()
@@ -112,7 +113,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps({"status": "ignored", "type": event_type}).encode())
 
 
-def send_license_email(delivery) -> None:
+def send_license_email(delivery: LicenseDelivery) -> None:
     """Send a license key delivery email.
 
     Uses SMTP credentials from environment variables:
@@ -192,7 +193,7 @@ def create_webhook_server(host: str = "0.0.0.0", port: int = 8444) -> HTTPServer
     return server
 
 
-def run_webhook_server(host: str = "0.0.0.0", port: int = None):
+def run_webhook_server(host: str = "0.0.0.0", port: int | None = None) -> None:
     """Run the Stripe webhook server.
 
     Reads WEBHOOK_PORT from environment (default 8444).
