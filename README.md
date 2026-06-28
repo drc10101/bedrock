@@ -21,6 +21,8 @@
 
 **You don't bolt security on after the fact. You build on Bedrock, and your app inherits it.**
 
+New? Read the **[Getting Started Guide](GETTING_STARTED.md)** — a step-by-step walkthrough from install to a working app with identity, encryption, consent, and audit.
+
 Bedrock is a security framework that your application calls into — not a service you route traffic through. When your app uses Bedrock's SDK, every node gets a cryptographic identity, every field write gets encrypted at rest, every cross-silo read requires cryptographic consent, and every action gets written to a tamper-evident audit chain. Your app focuses on business logic. Bedrock handles the security guarantees.
 
 ## What Your App Gets
