@@ -1,90 +1,205 @@
-# BEDROCK
+# Bedrock
 
-Trade Secret — InFill Systems, LLC
-All rights reserved. No public distribution.
+**Identity-based security framework. Every node is a user. Everything between is encrypted at rest.**
 
-Identity-based security framework. Every node is a user. Everything between is encrypted at rest.
+Bedrock provides the foundational security layer for applications that handle sensitive data — healthcare, finance, defense, and beyond. It enforces identity at every endpoint, encrypts all data at rest, and gates every cross-silo access through cryptographic consent.
 
-## Structure
+## Core Principles
+
+- **Every node is a user.** Each compute endpoint has a cryptographic identity.
+- **Encrypted at rest, always.** Data exists in cleartext only at the consuming endpoint, only for the minimum time required.
+- **Consent-gated access.** No cross-silo data access without cryptographic proof of consent.
+- **Audit everything.** SHA-256 hash chain — tamper-evident, tamper-resistant.
+- **Self-hosted first.** No Bedrock-operated infrastructure required.
+
+## Architecture
 
 ```
-BEDROCK/
-├── core/
-│   ├── bedrock/
-│   │   ├── __init__.py          # Package root, version
-│   │   ├── config.py            # CoreConfig, EncryptionConfig, MeshConfig, LicensingConfig
-│   │   ├── encryption/          # B-102: Field-level + E2EE encryption engine
-│   │   │   ├── __init__.py
-│   │   │   ├── engine.py        # EncryptionEngine, FieldEncryptor, E2EEDeliverer
-│   │   │   ├── aad.py           # Additional Authenticated Data
-│   │   │   └── version.py       # Ciphertext format versioning (v1 Fernet, v2 GCM)
-│   │   ├── key_management/      # B-103: HKDF key hierarchy, silo key derivation
-│   │   │   ├── __init__.py
-│   │   │   └── keys.py          # MasterKey, SiloKey, KeyManager
-│   │   ├── data_separation/     # B-104: Silos, anonymous IDs, consent gates
-│   │   │   ├── __init__.py
-│   │   │   ├── silo.py          # Silo model
-│   │   │   ├── anonymous_id.py  # Adjective-animal-noun ID generation
-│   │   │   └── consent.py       # Consent-gated cross-silo access
-│   │   ├── identity/           # B-105/106/107: Identity Fabric
-│   │   │   ├── __init__.py
-│   │   │   ├── node.py         # Node, NodeID, NodeState
-│   │   │   ├── attestation.py  # Boot-time attestation
-│   │   │   ├── certificates.py # Certificate lifecycle (CA-enforced)
-│   │   │   └── capabilities.py  # CapabilityScope, DataCategory
-│   │   ├── audit/              # B-108: SHA-256 hash chain
-│   │   │   ├── __init__.py
-│   │   │   └── chain.py        # AuditChain, AuditEntry
-│   │   ├── access_control/     # B-109: RBAC, sessions, MFA
-│   │   │   ├── __init__.py
-│   │   │   └── controller.py  # AccessController, Role, Session
-│   │   ├── transport/          # B-110: TLS, E2EE, downgrade detection
-│   │   │   ├── __init__.py
-│   │   │   └── security.py    # TransportLayer
-│   │   ├── mesh/               # B-111: Self-Healing Mesh
-│   │   │   ├── __init__.py
-│   │   │   ├── detector.py    # AttackDetector, SignalType
-│   │   │   ├── state_machine.py # MeshStateMachine (5-state lifecycle)
-│   │   │   └── router.py      # MeshRouter (scope-aware routing)
-│   │   └── licensing/          # B-308: License enforcement
-│   │       ├── __init__.py
-│   │       └── enforcement.py  # LicenseEnforcer, License, LicenseTier
-│   └── pyproject.toml         # Build config, dependencies, tool settings
-├── sdk/                        # B-2xx: Developer toolkit (Python + TypeScript)
-├── docs/
-│   ├── BEDROCK_ARCHITECTURE_SPEC.md
-│   └── BEDROCK_IMPLEMENTATION_PLAN.md
-├── tests/
-│   ├── conftest.py
-│   ├── test_config.py
-│   ├── test_aad.py
-│   ├── test_ciphertext_format.py
-│   ├── test_anonymous_id.py
-│   ├── test_node.py
-│   ├── test_capabilities.py
-│   ├── test_mesh_state_machine.py
-│   ├── test_detector.py
-│   └── test_licensing.py
-└── .gitignore
+┌─────────────────────────────────────────────────────┐
+│                    Application                       │
+├──────────┬──────────┬──────────┬────────────────────┤
+│  Python  │TypeScript│   CLI    │     REST API       │
+│   SDK    │   SDK    │ bedrock  │  (FastAPI/uvicorn) │
+├──────────┴──────────┴──────────┴────────────────────┤
+│                  Bedrock Core                        │
+├──────────┬──────────┬──────────┬──────────┬─────────┤
+│Encryption│  Identity │   Data   │  Access  │  Audit  │
+│  Engine  │  Fabric   │ Silos    │ Control  │  Chain  │
+├──────────┴──────────┴──────────┴──────────┴─────────┤
+│              Key Management (HKDF)                   │
+├─────────────────────────────────────────────────────┤
+│           Self-Healing Mesh Transport                │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
 
 ```bash
-cd core
-pip install -e ".[dev]"
-pytest
+# Install
+pip install bedrock-core
+
+# Initialize a project
+bedrock init ./my-project
+cd my-project
+
+# Generate a signing key
+bedrock keygen
+
+# Issue a developer license
+bedrock license issue --tier developer --licensee "your-name" --days 365
+
+# Start the API server
+bedrock serve
 ```
 
-## Rules
+### From Source
 
-- **No public repos.** This project never touches GitHub, GitLab, or any public host.
-- **No cloud sync.** No OneDrive, no Dropbox, no iCloud for this directory.
-- **No secrets in code.** Keys and credentials go in .env files (gitignored).
-- **Every node is a user.** This is the core principle. Every compute endpoint has an identity, and everything between them is ciphertext.
-- **Encrypted at rest, always.** Data exists in clear text only at the consuming endpoint, only for the minimum time required.
-- **Self-hosted first.** The architecture must work without any Bedrock-operated infrastructure.
+```bash
+git clone https://github.com/infill-systems/bedrock.git
+cd bedrock/core
+pip install -e ".[dev]"
+pytest
 
-## Relationship to InFill
+# Or with Docker
+docker compose -f deploy/docker-compose.yml up
+```
 
-InFill is the first vertical application built on Bedrock. Healthcare proved the architecture. Bedrock extracts the reusable patterns and opens them to every vertical — banking, investment, insurance, defense, and beyond.
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `bedrock init [dir]` | Initialize a new project (config, keys, env template) |
+| `bedrock serve [--host] [--port]` | Start the API server |
+| `bedrock keygen [--key-id]` | Generate a signing key |
+| `bedrock license issue --tier --licensee` | Issue a license key |
+| `bedrock license validate --key` | Validate a license key |
+| `bedrock license revoke --key-id` | Revoke a signing key |
+| `bedrock health [--json]` | Run health checks |
+| `bedrock status` | Show system status and config |
+
+## Licensing
+
+Bedrock uses a two-tier licensing model:
+
+| Tier | Price | Nodes | Use Case |
+|------|-------|-------|----------|
+| Developer | $99/yr | 3 | Local development, self-signed certs |
+| Professional | $499/yr | 10 | Team development, self-signed certs |
+| Starter | $5K/yr | 5 | Production, CA-enforced |
+| Business | $20K/yr | — | Production, CA-enforced |
+| Enterprise | Custom | — | Production, CA-enforced, unlimited |
+
+Developer and Professional tiers are for building and testing. Production Runtime tiers enforce per-node CA-signed certificates and offer unlimited scale.
+
+## Project Structure
+
+```
+bedrock/
+├── core/                    # Core framework (this repo)
+│   ├── bedrock/
+│   │   ├── encryption/      # Field-level + E2EE encryption engine
+│   │   ├── key_management/  # HKDF key hierarchy, silo key derivation
+│   │   ├── data_separation/ # Silos, anonymous IDs, consent gates
+│   │   ├── identity/        # Identity Fabric, node attestation, certificates
+│   │   ├── audit/           # SHA-256 hash chain
+│   │   ├── access_control/  # RBAC, sessions, MFA
+│   │   ├── transport/       # TLS, E2EE, downgrade detection
+│   │   ├── mesh/            # Self-healing mesh (attack detection, routing)
+│   │   ├── storage/         # Encrypted storage backend
+│   │   ├── licensing/       # License enforcement, keygen, Stripe integration
+│   │   ├── metering/        # Per-tier rate limiting and usage tracking
+│   │   ├── server/          # FastAPI REST API server with TLS
+│   │   ├── config.py        # CoreConfig, encryption/identity/mesh configs
+│   │   ├── health.py        # Health checker for all subsystems
+│   │   └── cli.py           # bedrock CLI (init, serve, keygen, license, health, status)
+│   └── pyproject.toml
+├── sdk-python/              # Python SDK
+├── sdk-ts/                  # TypeScript SDK
+├── deploy/                  # Docker + deployment configs
+├── docs/                    # Architecture, implementation plans, technical notes
+├── tests/                   # Core test suite (788 tests)
+└── assets/                  # Logo and branding
+```
+
+## SDKs
+
+### Python
+
+```python
+from bedrock_sdk import BedrockClient
+
+client = BedrockClient(
+    base_url="https://bedrock.example.com",
+    license_key="BR-DEV-xxxx-xxxx",
+)
+
+# Register a node
+node = client.nodes.register(name="my-service", node_type="application")
+
+# Create a data silo
+silo = client.silos.create(
+    name="patient-records",
+    display_name="Patient Records",
+    categories=["medical", "phi"],
+)
+
+# Encrypt a field
+ciphertext = client.encryption.encrypt(
+    plaintext="SSN-123-45-6789",
+    silo=silo.silo_id,
+    record_id="patient-001",
+    scope="ssn",
+    operation="store",
+)
+
+# Request consent for cross-silo access
+consent = client.consent.request(
+    requester_id=node.node_id,
+    target_id="patient-001",
+    silo_id=silo.silo_id,
+    purpose="treatment",
+    scope=["ssn", "diagnosis"],
+)
+```
+
+### TypeScript
+
+```typescript
+import { BedrockClient } from "@infill/bedrock-sdk";
+
+const client = new BedrockClient({
+  baseUrl: "https://bedrock.example.com",
+  licenseKey: "BR-DEV-xxxx-xxxx",
+});
+
+// Same API surface as Python SDK
+const node = await client.nodes.register({ name: "my-service" });
+const silo = await client.silos.create({ name: "patient-records" });
+```
+
+## Testing
+
+```bash
+# Core tests
+cd core && pytest
+
+# Python SDK tests
+cd sdk-python && pytest
+
+# TypeScript SDK tests
+cd sdk-ts && npm test
+```
+
+All 930 tests pass: 788 Python core + 20 Python SDK + 122 TypeScript SDK.
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+**Do not report security issues through public GitHub issues.**
+
+## License
+
+Proprietary. See [LICENSE](LICENSE) for terms.
+
+This software is the confidential and proprietary information of InFill Systems, LLC. You shall not disclose such confidential information and shall use it only in accordance with the terms of the license agreement you entered into with InFill Systems, LLC.

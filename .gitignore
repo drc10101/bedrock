@@ -1,5 +1,4 @@
-# Bedrock - Trade Secret - DO NOT DISTRIBUTE
-# No public repos. No cloud sync. No exceptions.
+# Bedrock — Proprietary, InFill Systems, LLC
 
 # Environment and secrets
 .env
@@ -15,6 +14,7 @@ secrets/
 node_modules/
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
 
@@ -26,6 +26,9 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+htmlcov/
+.coverage
+coverage.xml
 
 # IDE
 .vscode/
@@ -45,3 +48,9 @@ logs/
 # Temporary
 *.tmp
 *.bak
+
+# Stripe keys (never commit)
+.stripe/
+
+# Data directories (local dev only)
+data/

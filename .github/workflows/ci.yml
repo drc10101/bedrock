@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13', '3.14']
+        python-version: ['3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -21,12 +21,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
+          cache-dependency-path: core/pyproject.toml
 
       - name: Install dependencies
         run: |
+          cd core
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio
+          pip install -e ".[dev]"
 
       - name: Run Python tests
         env:
@@ -34,14 +35,14 @@ jobs:
           BEDROCK_DEV_MODE: true
           BEDROCK_TIER: developer
         run: |
-          python -m pytest tests/ -v --tb=short --cov=bedrock --cov-report=xml --cov-report=term-missing
+          cd core
+          python -m pytest tests/ -v --tb=short
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: matrix.python-version == '3.14'
-        with:
-          name: coverage-report
-          path: coverage.xml
+      - name: Run Python SDK tests
+        run: |
+          cd sdk-python
+          python -m pip install -e ".[dev]"
+          python -m pytest tests/ -v --tb=short
 
   test-typescript:
     runs-on: ubuntu-latest
@@ -63,13 +64,7 @@ jobs:
         run: npm ci
 
       - name: Run TypeScript tests
-        run: npx jest --verbose --coverage
-
-      - name: Upload TS coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: ts-coverage-report
-          path: sdk-ts/coverage/
+        run: npx jest --verbose
 
   security-scan:
     runs-on: ubuntu-latest
@@ -80,18 +75,20 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: |
+          cd core
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
           pip install bandit safety
-          pip install -r requirements.txt
 
       - name: Bandit security scan
         run: bandit -r core/bedrock/ -f json -o bandit-report.json || true
 
       - name: Safety dependency check
-        run: safety check -r requirements.txt || true
+        run: safety check || true
 
   docker-build:
     runs-on: ubuntu-latest

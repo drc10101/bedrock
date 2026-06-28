@@ -4,21 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bedrock-core"
-version = "0.1.0"
+version = "0.3.0"
 description = "Identity-based security framework. Every node is a user. Everything between is encrypted at rest."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "TRADE SECRET — InFill Systems, LLC. All rights reserved."}
+license = {text = "Proprietary — InFill Systems, LLC. See LICENSE."}
 authors = [
     {name = "InFill Systems, LLC"},
 ]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
+    "License :: Other/Proprietary",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Security",
     "Topic :: Security :: Cryptography",
     "Private :: Do Not Upload",
@@ -27,21 +30,12 @@ classifiers = [
 dependencies = [
     # Core crypto — proven in InFill
     "cryptography>=42.0",
-    # HKDF key derivation
-    "cryptography>=42.0",
     # Async framework
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
-    # Database
-    "sqlcipher3>=0.5; sys_platform == 'linux'",
     # UUID v7 (time-sortable)
     "uuid7>=0.1",
-    # Audit chain hashing
-    "hashlib; sys_platform != 'win32'",
 ]
-
-[project.scripts]
-bedrock = "bedrock.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -53,10 +47,21 @@ dev = [
     "black>=24.0",
     "isort>=5.13",
 ]
+sqlcipher = [
+    # Optional: encrypted SQLite storage for production
+    "sqlcipher3>=0.5",
+]
 hsm = [
-    # HSM integration for production key storage
+    # Optional: HSM integration for production key storage
     "pkcs11>=1.1",
 ]
+stripe = [
+    # Optional: Stripe integration for license billing
+    "stripe>=10.0",
+]
+
+[project.scripts]
+bedrock = "bedrock.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

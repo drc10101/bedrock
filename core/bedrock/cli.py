@@ -28,7 +28,7 @@ from bedrock.health import HealthChecker
 from bedrock.licensing.keygen import LicenseKeygen, SigningKey
 from bedrock.licensing.enforcement import LicenseEnforcer, LicenseTier
 
-VERSION = "0.1.0"
+VERSION = "0.3.0"
 
 
 def cmd_init(args):
