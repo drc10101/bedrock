@@ -31,6 +31,13 @@ from bedrock.licensing.keygen import (
     LicenseKeygen,
     SigningKey,
 )
+from bedrock.licensing.checkout import (
+    CheckoutTier,
+    CheckoutResult,
+    LicenseDelivery,
+    create_checkout_session,
+    configure_stripe,
+)
 
 __all__ = [
     "LicenseEnforcer",
@@ -46,4 +53,9 @@ __all__ = [
     "STRIPE_PRICES",
     "LicenseKeygen",
     "SigningKey",
+    "CheckoutTier",
+    "CheckoutResult",
+    "LicenseDelivery",
+    "create_checkout_session",
+    "configure_stripe",
 ]

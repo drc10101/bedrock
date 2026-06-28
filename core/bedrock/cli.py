@@ -401,6 +401,57 @@ def cmd_trial(args):
     return 0
 
 
+def cmd_checkout(args):
+    """Create a Stripe checkout session for a paid license."""
+    from bedrock.licensing.checkout import CheckoutTier, create_checkout_session
+
+    tier_map = {
+        "developer_individual": CheckoutTier.DEVELOPER_INDIVIDUAL,
+        "developer_team": CheckoutTier.DEVELOPER_TEAM,
+    }
+    tier = tier_map[args.tier]
+
+    try:
+        result = create_checkout_session(
+            tier=tier,
+            customer_email=args.email,
+            success_url=args.success_url,
+            cancel_url=args.cancel_url,
+        )
+    except ValueError as e:
+        print(f"Configuration error: {e}", file=sys.stderr)
+        print("Make sure BEDROCK_STRIPE_SECRET_KEY and BEDROCK_STRIPE_PRICE_* are set.", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Stripe error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Bedrock Checkout — {args.tier}")
+    print(f"{'=' * 40}")
+    print(f"  Session ID: {result.session_id}")
+    print(f"  Checkout URL: {result.session_url}")
+    print()
+    print(f"  Open the checkout URL in a browser to complete payment.")
+    return 0
+
+
+def cmd_webhook(args):
+    """Start the Stripe webhook server for license delivery."""
+    from bedrock.licensing.webhook import run_webhook_server
+
+    port = args.port or int(os.environ.get("WEBHOOK_PORT", "8444"))
+
+    # Verify required env vars
+    required = ["BEDROCK_STRIPE_SECRET_KEY", "BEDROCK_STRIPE_WEBHOOK_SECRET", "BEDROCK_SIGNING_KEY"]
+    missing = [v for v in required if not os.environ.get(v)]
+    if missing:
+        print(f"Missing required environment variables: {', '.join(missing)}", file=sys.stderr)
+        return 1
+
+    run_webhook_server(host=args.host, port=port)
+    return 0
+
+
 def _load_keygen(args):
     """Load LicenseKeygen with existing keys or create new."""
     keys_path = Path(args.keys_file) if args.keys_file else Path("data/keys/signing_keys.json")
@@ -464,6 +515,23 @@ def build_parser():
     trial_parser.add_argument("--licensee", default="trial-user", help="Name or email for the trial")
     trial_parser.add_argument("--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file")
     trial_parser.set_defaults(func=cmd_trial)
+
+    # checkout
+    checkout_parser = subparsers.add_parser("checkout", help="Create a Stripe checkout session for paid license")
+    checkout_parser.add_argument("--tier", required=True, choices=["developer_individual", "developer_team"],
+                                help="License tier to purchase")
+    checkout_parser.add_argument("--email", help="Customer email (pre-fills checkout)")
+    checkout_parser.add_argument("--success-url", default="https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
+                                help="URL to redirect on success")
+    checkout_parser.add_argument("--cancel-url", default="https://bedrock.dev/license/cancel",
+                                help="URL to redirect on cancellation")
+    checkout_parser.set_defaults(func=cmd_checkout)
+
+    # webhook
+    webhook_parser = subparsers.add_parser("webhook", help="Start the Stripe webhook server for license delivery")
+    webhook_parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
+    webhook_parser.add_argument("--port", type=int, default=8444, help="Bind port (default: 8444)")
+    webhook_parser.set_defaults(func=cmd_webhook)
 
     # health
     health_parser = subparsers.add_parser("health", help="Run health checks")
