@@ -1,6 +1,21 @@
-# Bedrock
+<p align="center">
+  <img src="assets/Bedrock_Logo.png" alt="Bedrock" width="600">
+</p>
 
-**Identity-based security framework. Every node is a user. Everything between is encrypted at rest.**
+<h3 align="center">Identity-based security framework</h3>
+
+<p align="center">
+  Every node is a user. Everything between is encrypted at rest.
+</p>
+
+<p align="center">
+  <a href="https://github.com/drc10101/bedrock/releases/tag/v0.3.0"><img src="https://img.shields.io/badge/version-0.3.0-blue" alt="Version"></a>
+  <img src="https://img.shields.io/badge/tests-930-passing-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
+  <img src="https://img.shields.io/badge/license-proprietary-red" alt="License">
+</p>
+
+---
 
 Bedrock provides the foundational security layer for applications that handle sensitive data — healthcare, finance, defense, and beyond. It enforces identity at every endpoint, encrypts all data at rest, and gates every cross-silo access through cryptographic consent.
 
@@ -55,7 +70,7 @@ bedrock serve
 ### From Source
 
 ```bash
-git clone https://github.com/infill-systems/bedrock.git
+git clone https://github.com/drc10101/bedrock.git
 cd bedrock/core
 pip install -e ".[dev]"
 pytest
@@ -90,36 +105,6 @@ Bedrock uses a two-tier licensing model:
 | Enterprise | Custom | — | Production, CA-enforced, unlimited |
 
 Developer and Professional tiers are for building and testing. Production Runtime tiers enforce per-node CA-signed certificates and offer unlimited scale.
-
-## Project Structure
-
-```
-bedrock/
-├── core/                    # Core framework (this repo)
-│   ├── bedrock/
-│   │   ├── encryption/      # Field-level + E2EE encryption engine
-│   │   ├── key_management/  # HKDF key hierarchy, silo key derivation
-│   │   ├── data_separation/ # Silos, anonymous IDs, consent gates
-│   │   ├── identity/        # Identity Fabric, node attestation, certificates
-│   │   ├── audit/           # SHA-256 hash chain
-│   │   ├── access_control/  # RBAC, sessions, MFA
-│   │   ├── transport/       # TLS, E2EE, downgrade detection
-│   │   ├── mesh/            # Self-healing mesh (attack detection, routing)
-│   │   ├── storage/         # Encrypted storage backend
-│   │   ├── licensing/       # License enforcement, keygen, Stripe integration
-│   │   ├── metering/        # Per-tier rate limiting and usage tracking
-│   │   ├── server/          # FastAPI REST API server with TLS
-│   │   ├── config.py        # CoreConfig, encryption/identity/mesh configs
-│   │   ├── health.py        # Health checker for all subsystems
-│   │   └── cli.py           # bedrock CLI (init, serve, keygen, license, health, status)
-│   └── pyproject.toml
-├── sdk-python/              # Python SDK
-├── sdk-ts/                  # TypeScript SDK
-├── deploy/                  # Docker + deployment configs
-├── docs/                    # Architecture, implementation plans, technical notes
-├── tests/                   # Core test suite (788 tests)
-└── assets/                  # Logo and branding
-```
 
 ## SDKs
 
@@ -190,7 +175,7 @@ cd sdk-python && pytest
 cd sdk-ts && npm test
 ```
 
-All 930 tests pass: 788 Python core + 20 Python SDK + 122 TypeScript SDK.
+All 930 tests pass: 788 core + 20 Python SDK + 122 TypeScript SDK.
 
 ## Security
 
@@ -202,4 +187,4 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 Proprietary. See [LICENSE](LICENSE) for terms.
 
-This software is the confidential and proprietary information of InFill Systems, LLC. You shall not disclose such confidential information and shall use it only in accordance with the terms of the license agreement you entered into with InFill Systems, LLC.
+This software is the confidential and proprietary information of InFill Systems, LLC.
