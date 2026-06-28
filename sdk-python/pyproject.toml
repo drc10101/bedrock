@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "bedrock-sdk"
@@ -26,6 +26,11 @@ Homepage = "https://bedrock.dev"
 
 [tool.setuptools.packages.find]
 include = ["bedrock_sdk*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
