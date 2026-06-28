@@ -587,10 +587,15 @@ def run_server(
 
     ssl_kwargs: dict[str, Any] = {}
     if tls_config and tls_config.enabled:
-        from bedrock.server.tls import create_ssl_context
-
-        ssl_kwargs["ssl"] = create_ssl_context(tls_config)
-        scheme = "https"
+        if tls_config.cert_file and tls_config.key_file:
+            ssl_kwargs["ssl_certfile"] = tls_config.cert_file
+            ssl_kwargs["ssl_keyfile"] = tls_config.key_file
+            if tls_config.ca_file:
+                ssl_kwargs["ssl_ca_certs"] = tls_config.ca_file
+            scheme = "https"
+        else:
+            print("Warning: TLS enabled but no cert/key files configured. Starting without TLS.")
+            scheme = "http"
     else:
         scheme = "http"
 
