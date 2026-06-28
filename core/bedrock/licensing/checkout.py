@@ -89,9 +89,7 @@ def create_checkout_session(
 
     # Resolve price ID from environment
     price_map = {
-        CheckoutTier.DEVELOPER_INDIVIDUAL: os.environ.get(
-            "BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"
-        ),
+        CheckoutTier.DEVELOPER_INDIVIDUAL: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"),
         CheckoutTier.DEVELOPER_TEAM: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM"),
     }
     price_id = price_map.get(tier)
@@ -149,9 +147,7 @@ def verify_webhook_signature(payload: bytes, sig_header: str) -> dict[str, Any]:
     """
     webhook_secret = os.environ.get("BEDROCK_STRIPE_WEBHOOK_SECRET")
     if not webhook_secret:
-        raise ValueError(
-            "BEDROCK_STRIPE_WEBHOOK_SECRET environment variable is required"
-        )
+        raise ValueError("BEDROCK_STRIPE_WEBHOOK_SECRET environment variable is required")
 
     event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     return dict(event)
@@ -173,9 +169,9 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
     session = event["data"]["object"]
     metadata = session.get("metadata", {})
     tier_str = metadata.get("bedrock_tier", "developer_individual")
-    customer_email = session.get("customer_email", "") or session.get(
-        "customer_details", {}
-    ).get("email", "")
+    customer_email = session.get("customer_email", "") or session.get("customer_details", {}).get(
+        "email", ""
+    )
 
     # Map checkout tier to license tier
     tier_map = {
