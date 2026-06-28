@@ -26,6 +26,8 @@ from urllib.parse import parse_qs, urlparse
 from bedrock.config import CoreConfig
 from bedrock.health import HealthChecker
 from bedrock.server.tls import TLSConfig, wrap_server_with_tls
+from bedrock.storage.persistence import PersistentBedrock
+from bedrock.storage.sqlite_backend import SQLiteBackend
 
 if TYPE_CHECKING:
     from bedrock.metering import UsageMeter
@@ -62,6 +64,7 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
     config: CoreConfig | None = None
     api_keys: dict[str, dict] = {}  # api_key -> {tier, node_id, roles}
     usage_meter: UsageMeter | None = None  # Set by create_server
+    persistent: PersistentBedrock | None = None  # Set by create_server
 
     def log_message(self, fmt: str, *args: Any) -> None:
         """Override to use structured logging."""
@@ -273,13 +276,15 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         self._require_auth()
         body = self._parse_body()
 
-        from bedrock.identity.registration import NodeRegistry
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        reg = NodeRegistry()
-        node = reg.register(
+        node = self.persistent.registry.register(
             name=body.get("name", f"node-{uuid.uuid4().hex[:8]}"),
             node_type=body.get("node_type", "generic"),
         )
+        self.persistent.save_node(node)
 
         self._send_json(
             {
@@ -293,32 +298,62 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
     def _handle_list_nodes(self) -> None:
         """GET /api/v1/nodes — List all nodes."""
         self._require_auth()
-        # NodeRegistry doesn't persist — return empty for now
-        self._send_json({"nodes": [], "total": 0})
+        if self.persistent is None:
+            self._send_json({"nodes": [], "total": 0})
+            return
+
+        nodes = [
+            {"node_id": n.node_id.uuid, "name": n.name, "state": n.state.value}
+            for n in self.persistent.registry._nodes.values()
+        ]
+        self._send_json({"nodes": nodes, "total": len(nodes)})
 
     def _handle_get_node(self, node_id: str = "") -> None:
         """GET /api/v1/nodes/{node_id} — Get node details."""
         self._require_auth()
-        self._send_error("Node not found", 404)
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
+
+        node = self.persistent.registry.get(node_id)
+        if node is None:
+            self._send_error("Node not found", 404)
+            return
+
+        self._send_json(
+            {
+                "node_id": node.node_id.uuid,
+                "name": node.name,
+                "state": node.state.value,
+            }
+        )
 
     def _handle_issue_certificate(self) -> None:
         """POST /api/v1/certificates — Issue a certificate."""
         self._require_auth()
         body = self._parse_body()
 
-        from bedrock.identity.certificates import CertificateManager
-        from bedrock.identity.registration import NodeRegistry
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        reg = NodeRegistry()
-        node = reg.register(
+        node = self.persistent.registry.register(
             name=body.get("node_name", "api-node"), node_type=body.get("node_type", "generic")
         )
+        self.persistent.save_node(node)
 
-        cm = CertificateManager()
-        cert = cm.issue_certificate(
+        cert = self.persistent.cert_manager.issue_certificate(
             node_uuid=node.node_id.uuid,
             node_name=node.name,
             public_key_hash=node.node_id.public_key_hex(),
+        )
+        self.persistent.save_certificate(
+            {
+                "serial_number": cert.serial,
+                "node_uuid": cert.node_uuid,
+                "node_name": cert.node_name,
+                "is_valid": True,
+            }
         )
 
         # Serialize certificate dataclass to dict
@@ -353,10 +388,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         """DELETE /api/v1/certificates/{node_id} — Revoke certificate."""
         self._require_auth()
 
-        from bedrock.identity.certificates import CertificateManager
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        cm = CertificateManager()
-        cm.revoke_certificate(node_id, reason="Revoked via API")
+        self.persistent.cert_manager.revoke_certificate(node_id, reason="Revoked via API")
 
         self._send_json({"status": "revoked", "node_id": node_id})
 
@@ -367,14 +403,16 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         self._require_auth()
         body = self._parse_body()
 
-        from bedrock.data_separation.silo import SiloManager
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        sm = SiloManager()
-        silo = sm.create_silo(
+        silo = self.persistent.silo_manager.create_silo(
             name=body.get("name", f"silo-{uuid.uuid4().hex[:8]}"),
             display_name=body.get("display_name", body.get("name", "New Silo")),
             categories=body.get("categories", []),
         )
+        self.persistent.save_silo(silo)
 
         self._send_json(
             {
@@ -389,10 +427,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         """GET /api/v1/silos — List all silos."""
         self._require_auth()
 
-        from bedrock.data_separation.silo import SiloManager
+        if self.persistent is None:
+            self._send_json({"silos": [], "total": 0})
+            return
 
-        sm = SiloManager()
-        silos = sm.list_silos()
+        silos = self.persistent.silo_manager.list_silos()
 
         self._send_json(
             {
@@ -408,10 +447,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         identity = self._require_auth()
         body = self._parse_body()
 
-        from bedrock.data_separation.consent import ConsentGate
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        consent = ConsentGate()
-        result = consent.request_consent(
+        result = self.persistent.consent_gate.request_consent(
             requesting_node_id=body.get("requesting_node_id", identity.get("node_id", "")),
             source_silo=body.get("source_silo", ""),
             target_silo=body.get("target_silo", ""),
@@ -433,10 +473,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         identity = self._require_auth()
         body = self._parse_body()
 
-        from bedrock.data_separation.consent import ConsentGate
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        consent = ConsentGate()
-        result = consent.approve_consent(
+        result = self.persistent.consent_gate.approve_consent(
             consent_id=consent_id,
             data_owner_id=body.get("data_owner_id", identity.get("node_id", "")),
         )
@@ -453,10 +494,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         identity = self._require_auth()
         body = self._parse_body()
 
-        from bedrock.data_separation.consent import ConsentGate
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
-        consent = ConsentGate()
-        consent.deny_consent(
+        self.persistent.consent_gate.deny_consent(
             consent_id=consent_id,
             data_owner_id=body.get("data_owner_id", identity.get("node_id", "")),
             reason=body.get("reason", "Denied via API"),
@@ -475,6 +517,10 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         """POST /api/v1/encrypt — Encrypt field data."""
         self._require_auth()
         body = self._parse_body()
+
+        if self.persistent is None:
+            self._send_error("Persistence not configured", 503)
+            return
 
         from bedrock.encryption.engine import FieldEncryptor
         from bedrock.key_management.keys import KeyManager
@@ -517,10 +563,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
 
-        from bedrock.audit.chain import AuditChain
+        if self.persistent is None:
+            self._send_json({"entries": [], "total": 0})
+            return
 
-        audit = AuditChain()
-        results = audit.query(
+        results = self.persistent.audit_chain.query(
             actor_id=params.get("actor_id", [None])[0],
             action=params.get("action", [None])[0],
             silo=params.get("silo", [None])[0],
@@ -545,10 +592,11 @@ class BedrockAPIHandler(BaseHTTPRequestHandler):
         """GET /api/v1/audit/verify — Verify audit chain integrity."""
         self._require_auth()
 
-        from bedrock.audit.chain import AuditChain
+        if self.persistent is None:
+            self._send_json({"verified": False, "error": "Persistence not configured"})
+            return
 
-        audit = AuditChain()
-        verified = audit.verify()
+        verified = self.persistent.audit_chain.verify()
 
         self._send_json({"verified": verified})
 
@@ -617,6 +665,7 @@ def create_server(
     api_keys: dict[str, dict] | None = None,
     tls_config: TLSConfig | None = None,
     enable_metering: bool = True,
+    db_path: str = "bedrock.db",
 ) -> HTTPServer:
     """Create and configure the Bedrock Core API server.
 
@@ -629,12 +678,15 @@ def create_server(
             - Development: generates self-signed certs
             - Production: requires BEDROCK_TLS_CERT and BEDROCK_TLS_KEY env vars
         enable_metering: Whether to enable usage metering and rate limiting.
+        db_path: Path to the SQLite database for persistence.
     """
     from bedrock.metering import UsageMeter
 
     BedrockAPIHandler.config = config or CoreConfig.from_env()
     BedrockAPIHandler.api_keys = api_keys or {}
     BedrockAPIHandler.usage_meter = UsageMeter() if enable_metering else None
+    BedrockAPIHandler.persistent = PersistentBedrock(storage=SQLiteBackend(db_path))
+    BedrockAPIHandler.persistent.restore_all()
 
     server = HTTPServer((host, port), BedrockAPIHandler)
 
@@ -669,9 +721,10 @@ def run_server(
     api_keys: dict[str, dict] | None = None,
     tls_config: TLSConfig | None = None,
     enable_metering: bool = True,
+    db_path: str = "bedrock.db",
 ) -> None:
     """Run the Bedrock Core API server."""
-    server = create_server(host, port, config, api_keys, tls_config, enable_metering)
+    server = create_server(host, port, config, api_keys, tls_config, enable_metering, db_path)
     effective_config = BedrockAPIHandler.config
     assert effective_config is not None  # Set by create_server
     metering_status = "enabled" if BedrockAPIHandler.usage_meter else "disabled"
