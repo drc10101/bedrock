@@ -543,7 +543,9 @@ def build_parser() -> argparse.ArgumentParser:
     license_parser.set_defaults(func=cmd_license)
 
     # dev
-    dev_parser = subparsers.add_parser("dev", help="Generate a free developer license (perpetual, no expiration)")
+    dev_parser = subparsers.add_parser(
+        "dev", help="Generate a free developer license (perpetual, no expiration)"
+    )
     dev_parser.add_argument(
         "--licensee", default="developer", help="Name or email for the developer"
     )
