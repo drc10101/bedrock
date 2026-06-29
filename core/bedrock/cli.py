@@ -6,7 +6,7 @@ Provides:
   bedrock serve     — Start the API server
   bedrock keygen    — Generate signing keys
   bedrock license   — Issue and validate license keys
-  bedrock trial     — Generate a free 30-day trial license
+  bedrock dev       — Generate a free developer license (perpetual, no expiration)
   bedrock health    — Run health checks
   bedrock status    — Show system status and config summary
   bedrock version   — Show version info
@@ -235,7 +235,6 @@ def _license_issue(args: argparse.Namespace) -> int:
 
     # Map tier string to LicenseTier enum
     tier_map = {
-        "trial": LicenseTier.TRIAL,
         "developer": LicenseTier.DEVELOPER,
         "starter": LicenseTier.STARTER,
         "business": LicenseTier.BUSINESS,
@@ -392,35 +391,40 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_trial(args: argparse.Namespace) -> int:
-    """Generate a free 30-day trial license key."""
+def cmd_dev(args: argparse.Namespace) -> int:
+    """Generate a free developer license key (perpetual, no expiration).
+
+    Developer licenses are free for non-production use. Self-signed certs,
+    localhost only, 3 nodes. No credit card required.
+    """
     enforcer = LicenseEnforcer()
-    license_key = enforcer.issue_trial_license(issued_to=args.licensee)
+    license_key = enforcer.issue_developer_license(issued_to=args.licensee)
 
     # Validate it immediately to show details
     license_obj = enforcer.validate_license(license_key)
 
-    print("Bedrock Trial License")
+    print("Bedrock Developer License")
     print(f"{'=' * 40}")
     print(f"  License key: {license_key}")
     print(f"  Tier:        {license_obj.tier.value}")
     print(f"  Licensee:    {license_obj.issued_to}")
     print(f"  Nodes:       {license_obj.max_nodes}")
-    print("  Expires:     30 days from now")
+    print("  Expires:     Never (perpetual)")
     print(f"  Features:    {', '.join(license_obj.features)}")
     print()
     print("Save this key to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY.")
-    print("After 30 days, upgrade at https://bedrock.dev/pricing")
+    print("For production use, see https://buildonbedrock.dev/pricing")
     return 0
 
 
 def cmd_checkout(args: argparse.Namespace) -> int:
-    """Create a Stripe checkout session for a paid license."""
+    """Create a Stripe checkout session for a production license."""
     from bedrock.licensing.checkout import CheckoutTier, create_checkout_session
 
     tier_map = {
-        "developer_individual": CheckoutTier.DEVELOPER_INDIVIDUAL,
-        "developer_team": CheckoutTier.DEVELOPER_TEAM,
+        "starter": CheckoutTier.STARTER,
+        "business": CheckoutTier.BUSINESS,
+        "enterprise": CheckoutTier.ENTERPRISE,
     }
     tier = tier_map[args.tier]
 
@@ -523,7 +527,7 @@ def build_parser() -> argparse.ArgumentParser:
     license_parser.add_argument(
         "--tier",
         default="developer",
-        choices=["trial", "developer", "starter", "business", "enterprise"],
+        choices=["developer", "starter", "business", "enterprise"],
         help="License tier",
     )
     license_parser.add_argument("--licensee", default="unknown", help="Licensee name or ID")
@@ -538,25 +542,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     license_parser.set_defaults(func=cmd_license)
 
-    # trial
-    trial_parser = subparsers.add_parser("trial", help="Generate a free 30-day trial license")
-    trial_parser.add_argument(
-        "--licensee", default="trial-user", help="Name or email for the trial"
+    # dev
+    dev_parser = subparsers.add_parser("dev", help="Generate a free developer license (perpetual, no expiration)")
+    dev_parser.add_argument(
+        "--licensee", default="developer", help="Name or email for the developer"
     )
-    trial_parser.add_argument(
+    dev_parser.add_argument(
         "--keys-file", default="data/keys/signing_keys.json", help="Path to signing keys file"
     )
-    trial_parser.set_defaults(func=cmd_trial)
+    dev_parser.set_defaults(func=cmd_dev)
 
     # checkout
     checkout_parser = subparsers.add_parser(
-        "checkout", help="Create a Stripe checkout session for paid license"
+        "checkout", help="Create a Stripe checkout session for a production license"
     )
     checkout_parser.add_argument(
         "--tier",
         required=True,
-        choices=["developer_individual", "developer_team"],
-        help="License tier to purchase",
+        choices=["starter", "business", "enterprise"],
+        help="Production license tier to purchase",
     )
     checkout_parser.add_argument("--email", help="Customer email (pre-fills checkout)")
     checkout_parser.add_argument(

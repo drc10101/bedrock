@@ -132,7 +132,6 @@ def send_license_email(delivery: LicenseDelivery) -> None:
     # Build email
     tier_display = {
         "developer": "Developer",
-        "trial": "Trial",
         "starter": "Starter",
         "business": "Business",
         "enterprise": "Enterprise",

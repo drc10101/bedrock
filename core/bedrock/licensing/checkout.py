@@ -2,16 +2,19 @@
 Bedrock Stripe Integration — Checkout Sessions and Webhook Handler.
 
 Handles:
-- Creating Stripe Checkout Sessions for paid license tiers
+- Creating Stripe Checkout Sessions for production license tiers
 - Receiving Stripe webhooks (checkout.session.completed) to issue license keys
 - Delivering license keys to customers via email confirmation
+
+Developer licenses are free (no Stripe checkout needed).
+Production tiers (Starter, Business, Enterprise) go through Stripe.
 
 Environment variables:
 - BEDROCK_STRIPE_SECRET_KEY: Stripe secret key (sk_live_... or sk_test_...)
 - BEDROCK_STRIPE_WEBHOOK_SECRET: Stripe webhook signing secret (whsec_...)
 - BEDROCK_SIGNING_KEY: HMAC key for signing Bedrock license keys
-- BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL: Price ID for $99/yr individual dev license
-- BEDROCK_STRIPE_PRICE_DEV_TEAM: Price ID for $499/yr team dev license
+- BEDROCK_STRIPE_PRICE_STARTER: Price ID for $5K/yr Starter license
+- BEDROCK_STRIPE_PRICE_BUSINESS: Price ID for $20K/yr Business license
 - BEDROCK_STRIPE_PRODUCT_ID: Stripe product ID for Bedrock
 
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
@@ -27,10 +30,11 @@ import stripe
 
 
 class CheckoutTier(Enum):
-    """Map Stripe price IDs to Bedrock license tiers."""
+    """Map Stripe price IDs to Bedrock production license tiers."""
 
-    DEVELOPER_INDIVIDUAL = "developer_individual"
-    DEVELOPER_TEAM = "developer_team"
+    STARTER = "starter"
+    BUSINESS = "business"
+    ENTERPRISE = "enterprise"
 
 
 @dataclass
@@ -69,14 +73,14 @@ def configure_stripe() -> None:
 def create_checkout_session(
     tier: CheckoutTier,
     customer_email: str | None = None,
-    success_url: str = "https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
-    cancel_url: str = "https://bedrock.dev/license/cancel",
+    success_url: str = "https://buildonbedrock.dev/pricing?success",
+    cancel_url: str = "https://buildonbedrock.dev/pricing",
     metadata: dict | None = None,
 ) -> CheckoutResult:
-    """Create a Stripe Checkout Session for a Bedrock license purchase.
+    """Create a Stripe Checkout Session for a Bedrock production license.
 
     Args:
-        tier: Which license tier to purchase.
+        tier: Which production license tier to purchase.
         customer_email: Pre-fill customer email.
         success_url: URL to redirect on success.
         cancel_url: URL to redirect on cancellation.
@@ -89,10 +93,18 @@ def create_checkout_session(
 
     # Resolve price ID from environment
     price_map = {
-        CheckoutTier.DEVELOPER_INDIVIDUAL: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"),
-        CheckoutTier.DEVELOPER_TEAM: os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM"),
+        CheckoutTier.STARTER: os.environ.get("BEDROCK_STRIPE_PRICE_STARTER"),
+        CheckoutTier.BUSINESS: os.environ.get("BEDROCK_STRIPE_PRICE_BUSINESS"),
+        CheckoutTier.ENTERPRISE: None,  # Enterprise is custom — handled separately
     }
     price_id = price_map.get(tier)
+
+    if tier == CheckoutTier.ENTERPRISE:
+        raise ValueError(
+            "Enterprise tier requires custom pricing. "
+            "Contact ops@infill.systems for a custom checkout link."
+        )
+
     if not price_id:
         raise ValueError(
             f"No price ID configured for tier {tier.value}. "
@@ -168,27 +180,24 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
 
     session = event["data"]["object"]
     metadata = session.get("metadata", {})
-    tier_str = metadata.get("bedrock_tier", "developer_individual")
+    tier_str = metadata.get("bedrock_tier", "starter")
     customer_email = session.get("customer_email", "") or session.get("customer_details", {}).get(
         "email", ""
     )
 
     # Map checkout tier to license tier
     tier_map = {
-        "developer_individual": LicenseTier.DEVELOPER,
-        "developer_team": LicenseTier.DEVELOPER,
+        "starter": LicenseTier.STARTER,
+        "business": LicenseTier.BUSINESS,
+        "enterprise": LicenseTier.ENTERPRISE,
     }
-    license_tier = tier_map.get(tier_str, LicenseTier.DEVELOPER)
-
-    # Determine max_devs for team licenses
-    max_devs = 5 if tier_str == "developer_individual" else 25
+    license_tier = tier_map.get(tier_str, LicenseTier.STARTER)
 
     # Generate the license key
     enforcer = LicenseEnforcer()
     license_key = enforcer.generate_license_key(
         tier=license_tier,
         issued_to=customer_email or "licensee",
-        max_devs=max_devs,
         # 1-year expiration from now
         expires_at=time.time() + (365 * 24 * 60 * 60),
     )
@@ -208,18 +217,19 @@ def handle_checkout_completed(event: dict) -> LicenseDelivery:
 
 
 def create_pricing_links() -> dict[str, str]:
-    """Generate Stripe payment links for all license tiers.
+    """Generate Stripe payment links for production license tiers.
 
     Returns a dict mapping tier names to Stripe payment links.
-    Used by the bedrock.dev landing page to route buyers.
+    Used by the buildonbedrock.dev landing page to route buyers.
+    Developer licenses are free — no Stripe link needed.
     """
     configure_stripe()
 
     links: dict[str, str] = {}
 
     price_config = {
-        "developer_individual": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"),
-        "developer_team": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM"),
+        "starter": os.environ.get("BEDROCK_STRIPE_PRICE_STARTER"),
+        "business": os.environ.get("BEDROCK_STRIPE_PRICE_BUSINESS"),
     }
 
     for tier_name, price_id in price_config.items():
@@ -229,8 +239,8 @@ def create_pricing_links() -> dict[str, str]:
             session = stripe.checkout.Session.create(
                 mode="subscription",
                 line_items=[{"price": price_id, "quantity": 1}],
-                success_url="https://bedrock.dev/license/success?session_id={CHECKOUT_SESSION_ID}",
-                cancel_url="https://bedrock.dev/license/cancel",
+                success_url="https://buildonbedrock.dev/pricing?success",
+                cancel_url="https://buildonbedrock.dev/pricing",
                 metadata={"bedrock_tier": tier_name},
             )
             links[tier_name] = session.url or ""

@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/tests-841-passing-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/python-3.11+-blue" alt="Python">
   <img src="https://img.shields.io/badge/license-BSL--1.1-orange" alt="License">
-  <img src="https://img.shields.io/badge/trial-free_30_days-success" alt="Free Trial">
+  <img src="https://img.shields.io/badge/developer-free-success" alt="Free Developer">
 </p>
 
 ---
@@ -73,8 +73,8 @@ pip install bedrock-core
 bedrock init ./my-project
 cd my-project
 
-# Generate a free 30-day trial license
-bedrock trial --licensee "your-email@example.com"
+# Generate a free developer license
+bedrock dev --licensee "your-email@example.com"
 
 # Start the API server
 bedrock serve
@@ -155,7 +155,7 @@ That's it. Your app now has identity, encryption, consent, and audit — because
 | Command | Description |
 |---------|-------------|
 | `bedrock init [dir]` | Initialize a new project (config, keys, env template) |
-| `bedrock trial [--licensee]` | Generate a free 30-day trial license |
+| `bedrock dev [--licensee]` | Generate a free developer license (perpetual, no expiration) |
 | `bedrock serve [--host] [--port]` | Start the API server |
 | `bedrock keygen [--key-id]` | Generate a signing key |
 | `bedrock license issue --tier --licensee` | Issue a license key |
@@ -168,21 +168,21 @@ That's it. Your app now has identity, encryption, consent, and audit — because
 
 Bedrock is source-available under the [Business Source License 1.1](LICENSE).
 
-### Free Trial
+### Free for Developers
 
-Start with a free 30-day trial — full developer features, 3 local nodes, self-signed certificates. No credit card required.
+Bedrock is free for non-production use — forever. No trial expiration, no credit card, no license key needed for development.
 
 ```bash
-bedrock trial --licensee "your-email@example.com"
+bedrock dev --licensee "your-email@example.com"
 ```
+
+Developer mode gives you self-signed certificates, localhost access, and 3 nodes. Build everything you want locally. When you're ready for production, upgrade to a runtime license.
 
 ### Pricing
 
 | Tier | Price | Nodes | Certificates | Use Case |
 |------|-------|-------|---------------|----------|
-| **Trial** | Free (30 days) | 3 | Self-signed | Evaluation and development |
-| **Developer** | $99/yr | 3 | Self-signed | Individual development |
-| **Professional** | $499/yr | 10 | Self-signed | Team development |
+| **Developer** | Free, forever | 3 | Self-signed | Development, testing, evaluation |
 | **Starter** | $5K/yr | 5 | CA-enforced | Production deployment |
 | **Business** | $20K/yr | 25 | CA-enforced | Production at scale |
 | **Enterprise** | Custom | Unlimited | CA-enforced | Mission-critical deployments |
@@ -191,9 +191,9 @@ bedrock trial --licensee "your-email@example.com"
 
 ### How It Works
 
-1. `bedrock trial` — get a free 30-day license with full developer features
+1. `bedrock dev` — get a free developer license, no expiration
 2. Build your app on Bedrock — identity, encryption, consent, audit are inherited
-3. When ready for production, purchase a runtime license at [bedrock.dev/pricing](https://bedrock.dev/pricing)
+3. When ready for production, purchase a runtime license at [buildonbedrock.dev](https://buildonbedrock.dev)
 4. Upgrade your license key — no code changes, no reinstallation
 
 ## Testing
@@ -221,6 +221,6 @@ See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
 
 This software is licensed under the [Business Source License 1.1](LICENSE).
 
-You may use, modify, and redistribute this software for non-production purposes (development, testing, evaluation) free of charge. Production use requires a paid license — see [bedrock.dev/pricing](https://bedrock.dev/pricing).
+You may use, modify, and redistribute this software for non-production purposes (development, testing, evaluation) free of charge and without time limit. Production use requires a paid license — see [buildonbedrock.dev](https://buildonbedrock.dev).
 
 The BSL converts to an open-source license (typically Apache 2.0) on a predetermined change date — see the LICENSE file for details.

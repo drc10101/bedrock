@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bedrock — Identity-based security framework</title>
   <meta name="description" content="Every node is a user. Everything between is encrypted at rest. Bedrock provides the foundational security layer for applications that handle sensitive data.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://buildonbedrock.dev/">
+  <meta property="og:title" content="Bedrock — Identity-based security framework">
+  <meta property="og:description" content="Every node is a user. Everything between is encrypted. Cryptographic identity, field-level encryption, consent-gated access, tamper-evident audit.">
+  <meta property="og:url" content="https://buildonbedrock.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://buildonbedrock.dev/assets/Bedrock_Logo.png">
+  <meta name="twitter:card" content="summary_large_image">
   <style>
     :root {
       --teal: #12c7ef;
@@ -310,11 +318,12 @@
         <img src="assets/Bedrock_Logo.png" alt="Bedrock" height="28">
       </a>
       <nav>
+        <a href="agents.html">For Agents</a>
         <a href="#principles">Principles</a>
         <a href="#quickstart">Quick Start</a>
         <a href="#pricing">Pricing</a>
         <a href="https://github.com/drc10101/bedrock" target="_blank">GitHub</a>
-        <a href="#quickstart" class="nav-cta">Start Free Trial</a>
+        <a href="#quickstart" class="nav-cta">Start Free</a>
       </nav>
     </div>
   </header>
@@ -324,7 +333,7 @@
       <h1>Every node is a user.<br><span>Everything between is encrypted.</span></h1>
       <p>Bedrock is the foundational security layer for applications that handle sensitive data. Identity at every endpoint. Encryption at rest. Consent-gated access. Audit everything.</p>
       <div class="hero-buttons">
-        <a href="#quickstart" class="btn btn-primary">Start Free Trial</a>
+        <a href="#quickstart" class="btn btn-primary">Start Free</a>
         <a href="https://github.com/drc10101/bedrock" target="_blank" class="btn btn-secondary">View on GitHub</a>
       </div>
       <div class="hero-badges">
@@ -332,7 +341,7 @@
         <div class="badge"><strong>Python 3.11+</strong></div>
         <div class="badge"><strong>TypeScript</strong> SDK</div>
         <div class="badge"><strong>BSL-1.1</strong> license</div>
-        <div class="badge"><strong>30-day</strong> free trial</div>
+        <div class="badge"><strong>Free</strong> for developers</div>
       </div>
     </div>
   </section>
@@ -374,16 +383,16 @@
   <section id="quickstart" style="background: linear-gradient(180deg, transparent, var(--teal-glow), transparent);">
     <div class="container">
       <h2>Quick Start</h2>
-      <p class="subtitle center">Up and running in 60 seconds. Free for 30 days. No credit card required.</p>
+      <p class="subtitle center">Up and running in 60 seconds. Free for development. No credit card required.</p>
 
       <div class="code-block">
 <span class="prompt">$</span> pip install bedrock-core
 <span class="prompt">$</span> bedrock init ./my-project
 <span class="output">Initialized Bedrock project in ./my-project</span>
 
-<span class="prompt">$</span> bedrock trial --licensee <span class="string">"you@example.com"</span>
-<span class="output">License generated (TRIAL, 30 days)
-  Key: 1:TRIAL:you@example.com:20260627:...
+<span class="prompt">$</span> bedrock dev --licensee <span class="string">"you@example.com"</span>
+<span class="output">License generated (DEVELOPER, perpetual)
+  Key: 1:DEVELOPER:you@example.com:20260627:...
   Save to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY</span>
 
 <span class="prompt">$</span> bedrock serve
@@ -417,41 +426,42 @@
   <section id="pricing">
     <div class="container">
       <h2>Pricing</h2>
-      <p class="subtitle center">Free to evaluate. Pay when you ship to production.</p>
+      <p class="subtitle center">Free for development. Pay when you ship to production.</p>
 
       <div class="pricing-grid">
-        <div class="pricing-card">
-          <h3>Trial</h3>
-          <div class="price">Free<span class="period"> / 30 days</span></div>
-          <div class="desc">Evaluate Bedrock locally. Full developer features.</div>
-          <ul>
-            <li>3 local nodes</li>
-            <li>Self-signed certificates</li>
-            <li>All APIs and SDKs</li>
-            <li>No credit card required</li>
-          </ul>
-        </div>
-
         <div class="pricing-card featured">
-          <div class="featured-badge">Most Popular</div>
+          <div class="featured-badge">Start Here</div>
           <h3>Developer</h3>
-          <div class="price">$99<span class="period"> / year</span></div>
-          <div class="desc">Individual development. Self-signed certificates.</div>
+          <div class="price">Free<span class="period"> / forever</span></div>
+          <div class="desc">Build locally. Ship when ready. No credit card.</div>
           <ul>
             <li>3 local nodes</li>
             <li>Self-signed certificates</li>
             <li>All APIs and SDKs</li>
+            <li>Audit chain and consent</li>
             <li>Community support</li>
           </ul>
         </div>
 
         <div class="pricing-card">
-          <h3>Professional</h3>
-          <div class="price">$499<span class="period"> / year</span></div>
-          <div class="desc">Team development. Up to 10 nodes.</div>
+          <h3>Starter</h3>
+          <div class="price">$5K<span class="period"> / year</span></div>
+          <div class="desc">Production deployment. CA-enforced certificates.</div>
           <ul>
-            <li>10 nodes</li>
-            <li>Self-signed certificates</li>
+            <li>5 nodes</li>
+            <li>CA-enforced certificates</li>
+            <li>All APIs and SDKs</li>
+            <li>Email support</li>
+          </ul>
+        </div>
+
+        <div class="pricing-card">
+          <h3>Business</h3>
+          <div class="price">$20K<span class="period"> / year</span></div>
+          <div class="desc">Production at scale. 25 nodes.</div>
+          <ul>
+            <li>25 nodes</li>
+            <li>CA-enforced certificates</li>
             <li>All APIs and SDKs</li>
             <li>Priority support</li>
           </ul>
@@ -459,7 +469,7 @@
       </div>
 
       <div style="text-align: center; margin-top: 32px; color: var(--text-dim); font-size: 14px;">
-        <p>Production deployment requires a separate license. <a href="#pricing" style="color: var(--teal);">Starter ($5K/yr)</a> | <a href="#pricing" style="color: var(--teal);">Business ($20K/yr)</a> | <a href="mailto:ops@infill.systems" style="color: var(--teal);">Enterprise (custom)</a></p>
+        <p>Need unlimited nodes or air-gapped deployment? <a href="mailto:ops@infill.systems" style="color: var(--teal);">Enterprise (custom pricing)</a></p>
       </div>
     </div>
   </section>
@@ -511,7 +521,7 @@ silo = client.silos.create(
     <div class="container">
       <div class="copyright">
         &copy; 2026 InFill Systems, LLC. All rights reserved.<br>
-        <span style="font-size: 12px;">BSL-1.1 license. Production use requires a paid license.</span>
+        <span style="font-size: 12px;">BSL-1.1 license. Free for development. Production use requires a paid license.</span>
       </div>
       <div class="links">
         <a href="https://github.com/drc10101/bedrock">GitHub</a>

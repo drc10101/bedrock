@@ -5,8 +5,11 @@ The CA will not issue certificates beyond the licensed node count.
 This is architectural enforcement, not DRM bolted on top.
 
 Two-tier model:
-  - Developer License ($99/$499 annual): dev mode, 3 local nodes, self-signed certs
+  - Developer License (free, perpetual): dev mode, 3 local nodes, self-signed certs
   - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
+
+Developer mode auto-generates a key on first run — no license key needed
+for non-production use. Production licenses are issued via keygen or checkout.
 
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
@@ -24,10 +27,8 @@ from enum import Enum
 class LicenseTier(Enum):
     """Licensing tiers controlling certificate authority and node limits.
 
-    TRIAL: Free 30-day evaluation. Full developer features, 3 nodes.
-        Automatically issued on first use. Converts to DEVELOPER after 30 days.
-    DEVELOPER: Self-signed certificates, localhost only, max 3 nodes.
-        For development and testing. No CA required. $99/yr individual, $499/yr team.
+    DEVELOPER: Free, perpetual. Self-signed certificates, localhost only, 3 nodes.
+        Auto-generated on first run. No license key needed for non-production use.
     STARTER: CA-signed certificates, max 5 nodes.
         For small production deployments. $5K/yr.
     BUSINESS: CA-signed certificates, max 25 nodes.
@@ -36,7 +37,6 @@ class LicenseTier(Enum):
         For large-scale or air-gapped deployments. Custom pricing.
     """
 
-    TRIAL = "trial"
     DEVELOPER = "developer"
     STARTER = "starter"
     BUSINESS = "business"
@@ -45,17 +45,15 @@ class LicenseTier(Enum):
 
 # Node limits per license tier (LicenseTier | str keys for robust enum lookups)
 NODE_LIMITS: dict[LicenseTier | str, float] = {
-    LicenseTier.TRIAL: 3,
     LicenseTier.DEVELOPER: 3,
     LicenseTier.STARTER: 5,
     LicenseTier.BUSINESS: 25,
     LicenseTier.ENTERPRISE: float("inf"),  # Unlimited
 }
 
-# Pricing per tier (annual USD)
-TIER_PRICING: dict[LicenseTier | str, int | dict[str, int] | str] = {
-    LicenseTier.TRIAL: 0,  # Free 30-day trial
-    LicenseTier.DEVELOPER: {"individual": 99, "team": 499},
+# Pricing per tier (annual USD) — Developer is free for non-production use (BSL-1.1)
+TIER_PRICING: dict[LicenseTier | str, int | str] = {
+    LicenseTier.DEVELOPER: 0,  # Free for non-production use
     LicenseTier.STARTER: 5000,
     LicenseTier.BUSINESS: 20000,
     LicenseTier.ENTERPRISE: "custom",
@@ -66,24 +64,10 @@ TIER_PRICING: dict[LicenseTier | str, int | dict[str, int] | str] = {
 # These are NOT hardcoded to prevent exposing billing configuration in source.
 STRIPE_PRODUCT_ID = os.environ.get("BEDROCK_STRIPE_PRODUCT_ID", "")
 
-STRIPE_PRICES = {
-    LicenseTier.DEVELOPER: {
-        "individual": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL", ""),
-        "team": os.environ.get("BEDROCK_STRIPE_PRICE_DEV_TEAM", ""),
-    },
-}
+STRIPE_PRICES: dict[LicenseTier | str, dict[str, str]] = {}
 
 # Feature flags per tier (LicenseTier | str keys for robust enum lookups)
 TIER_FEATURES: dict[LicenseTier | str, list[str]] = {
-    LicenseTier.TRIAL: [
-        "self_signed_certs",
-        "localhost_only",
-        "max_3_nodes",
-        "audit_export",
-        "basic_mesh",
-        "trial_mode",
-        "days_remaining_30",
-    ],
     LicenseTier.DEVELOPER: [
         "self_signed_certs",
         "localhost_only",
@@ -177,13 +161,8 @@ class License:
 
     @property
     def is_developer(self) -> bool:
-        """True if this is a developer license (includes trial)."""
-        return self.tier in (LicenseTier.DEVELOPER, LicenseTier.TRIAL)
-
-    @property
-    def is_trial(self) -> bool:
-        """True if this is a trial license."""
-        return self.tier == LicenseTier.TRIAL
+        """True if this is a developer (non-production) license."""
+        return self.tier == LicenseTier.DEVELOPER
 
     @property
     def is_runtime(self) -> bool:
@@ -311,7 +290,7 @@ class LicenseEnforcer:
                 tier, TIER_FEATURES.get(tier.value, TIER_FEATURES[LicenseTier.DEVELOPER])
             )
         )
-        dev_mode = tier in (LicenseTier.DEVELOPER, LicenseTier.TRIAL)
+        dev_mode = tier == LicenseTier.DEVELOPER
 
         payload = {
             "key_id": "bedrock-2026-01",
@@ -338,26 +317,23 @@ class LicenseEnforcer:
 
         return f"1:{payload_b64}:{signature_b64}"
 
-    def issue_trial_license(self, issued_to: str = "trial-user") -> str:
-        """Issue a free 30-day trial license.
+    def issue_developer_license(self, issued_to: str = "developer") -> str:
+        """Issue a free developer license (auto-generated on first run).
 
-        Trial licenses grant full developer features for 30 days.
-        After expiration, users must purchase a Developer or Production license.
+        Developer licenses are perpetual, free, and allow full non-production use.
+        No expiration. No credit card. Self-signed certs, localhost only, 3 nodes.
 
         Args:
-            issued_to: Name or identifier for the trial user.
+            issued_to: Name or identifier for the developer.
 
         Returns:
-            Signed trial license key string.
+            Signed developer license key string.
         """
-        trial_expires = time.time() + (30 * 86400)  # 30 days from now
         return self.generate_license_key(
-            tier=LicenseTier.TRIAL,
+            tier=LicenseTier.DEVELOPER,
             issued_to=issued_to,
-            expires_at=trial_expires,
+            # No expiration — developer licenses are perpetual
         )
-
-    TRIAL_DURATION_DAYS = 30  # Class-level constant for external reference
 
     def validate_license(self, license_key: str) -> License:
         """Validate a license key offline. No phone-home.
@@ -489,25 +465,18 @@ class LicenseEnforcer:
         """Get developer mode restrictions.
 
         Developer mode: localhost only, self-signed certs, 3 nodes max.
-        Trial mode: same as developer, plus days_remaining and trial watermark.
+        No expiration — developer licenses are perpetual for non-production use.
         """
         if not license_obj.is_developer:
             return {"dev_mode": False}
 
-        result = {
+        return {
             "dev_mode": True,
             "localhost_only": True,
             "self_signed_certs": True,
             "max_nodes": min(license_obj.max_nodes, 3),
             "no_production": True,
         }
-
-        if license_obj.is_trial:
-            days_left = license_obj.days_until_expiry or 0
-            result["trial_mode"] = True
-            result["trial_days_remaining"] = max(0, int(days_left))
-
-        return result
 
     def get_tier_info(self, tier: LicenseTier) -> dict:
         """Get information about a license tier.
@@ -541,7 +510,6 @@ class LicenseEnforcer:
         Returns available upgrade tiers with pricing.
         """
         tier_order = [
-            LicenseTier.TRIAL,
             LicenseTier.DEVELOPER,
             LicenseTier.STARTER,
             LicenseTier.BUSINESS,

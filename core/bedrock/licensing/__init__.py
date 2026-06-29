@@ -2,9 +2,11 @@
 Bedrock Licensing.
 
 Two-tier model:
-  - Trial (Free, 30 days): full developer features, 3 local nodes, self-signed certs
-  - Developer License ($99/$499 annual): dev mode, 3 local nodes, self-signed certs
+  - Developer License (free, perpetual): dev mode, 3 local nodes, self-signed certs
   - Production Runtime ($5K/$20K/custom annual): per-node CA enforcement
+
+Developer licenses auto-generate on first run — no license key needed for
+non-production use. Production licenses are issued via keygen or Stripe checkout.
 
 The Identity Fabric CA enforces the node count limit. No phone-home required.
 License keys are offline-validated signed payloads.

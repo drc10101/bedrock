@@ -1,6 +1,9 @@
 """
 Tests for Bedrock Stripe Checkout and Webhook integration.
 
+Checkout tiers are now production-only (Starter, Business, Enterprise).
+Developer licenses are free and issued via `bedrock dev`, not Stripe.
+
 SPDX-License-Identifier: BSL-1.1 — See LICENSE for details.
 """
 
@@ -26,21 +29,22 @@ class TestCheckoutTier(unittest.TestCase):
     """Test CheckoutTier enum and mappings."""
 
     def test_checkout_tier_values(self):
-        self.assertEqual(CheckoutTier.DEVELOPER_INDIVIDUAL.value, "developer_individual")
-        self.assertEqual(CheckoutTier.DEVELOPER_TEAM.value, "developer_team")
+        self.assertEqual(CheckoutTier.STARTER.value, "starter")
+        self.assertEqual(CheckoutTier.BUSINESS.value, "business")
+        self.assertEqual(CheckoutTier.ENTERPRISE.value, "enterprise")
 
     def test_checkout_tier_members(self):
         members = list(CheckoutTier)
-        self.assertEqual(len(members), 2)
+        self.assertEqual(len(members), 3)
 
 
 class TestCreateCheckoutSession(unittest.TestCase):
     """Test checkout session creation with mocked Stripe."""
 
     @patch("bedrock.licensing.checkout.stripe")
-    def test_create_session_developer_individual(self, mock_stripe):
-        """Test creating a checkout session for individual developer license."""
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_test_individual"
+    def test_create_session_starter(self, mock_stripe):
+        """Test creating a checkout session for Starter tier."""
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_test_starter"
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
 
         mock_session = MagicMock()
@@ -51,77 +55,87 @@ class TestCreateCheckoutSession(unittest.TestCase):
         from bedrock.licensing.checkout import create_checkout_session
 
         result = create_checkout_session(
-            tier=CheckoutTier.DEVELOPER_INDIVIDUAL,
-            customer_email="dev@example.com",
+            tier=CheckoutTier.STARTER,
+            customer_email="customer@example.com",
         )
 
         self.assertIsInstance(result, CheckoutResult)
         self.assertEqual(result.session_id, "cs_test_12345")
         self.assertEqual(result.session_url, "https://checkout.stripe.com/test/12345")
-        self.assertEqual(result.tier, CheckoutTier.DEVELOPER_INDIVIDUAL)
-        self.assertEqual(result.customer_email, "dev@example.com")
+        self.assertEqual(result.tier, CheckoutTier.STARTER)
+        self.assertEqual(result.customer_email, "customer@example.com")
 
         # Clean up
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
 
     @patch("bedrock.licensing.checkout.stripe")
-    def test_create_session_developer_team(self, mock_stripe):
-        """Test creating a checkout session for team developer license."""
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_TEAM"] = "price_test_team"
+    def test_create_session_business(self, mock_stripe):
+        """Test creating a checkout session for Business tier."""
+        os.environ["BEDROCK_STRIPE_PRICE_BUSINESS"] = "price_test_business"
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
 
         mock_session = MagicMock()
         mock_session.id = "cs_test_team_67890"
-        mock_session.url = "https://checkout.stripe.com/test/team"
+        mock_session.url = "https://checkout.stripe.com/test/business"
         mock_stripe.checkout.Session.create.return_value = mock_session
 
         from bedrock.licensing.checkout import create_checkout_session
 
         result = create_checkout_session(
-            tier=CheckoutTier.DEVELOPER_TEAM,
-            customer_email="team@example.com",
+            tier=CheckoutTier.BUSINESS,
+            customer_email="biz@company.com",
         )
 
-        self.assertEqual(result.tier, CheckoutTier.DEVELOPER_TEAM)
-        self.assertEqual(result.customer_email, "team@example.com")
+        self.assertEqual(result.tier, CheckoutTier.BUSINESS)
+        self.assertEqual(result.customer_email, "biz@company.com")
 
-        # Verify Stripe was called with subscription mode for team
+        # Verify Stripe was called with subscription mode
         call_kwargs = mock_stripe.checkout.Session.create.call_args[1]
         self.assertEqual(call_kwargs["mode"], "subscription")
 
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_TEAM"]
+        del os.environ["BEDROCK_STRIPE_PRICE_BUSINESS"]
+        del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
+
+    def test_create_session_enterprise_raises(self):
+        """Test that Enterprise tier raises ValueError (custom pricing)."""
+        os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
+
+        from bedrock.licensing.checkout import create_checkout_session
+
+        with self.assertRaises(ValueError) as ctx:
+            create_checkout_session(tier=CheckoutTier.ENTERPRISE)
+        self.assertIn("custom pricing", str(ctx.exception))
+
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
 
     def test_create_session_missing_price_id(self):
         """Test that missing price ID raises ValueError."""
-        # Clear any existing env vars
-        for key in ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL", "BEDROCK_STRIPE_SECRET_KEY"]:
+        for key in ["BEDROCK_STRIPE_PRICE_STARTER", "BEDROCK_STRIPE_SECRET_KEY"]:
             os.environ.pop(key, None)
 
         from bedrock.licensing.checkout import create_checkout_session
 
         with self.assertRaises((ValueError, Exception)):
-            # Will fail due to missing secret key and/or missing price ID
-            create_checkout_session(tier=CheckoutTier.DEVELOPER_INDIVIDUAL)
+            create_checkout_session(tier=CheckoutTier.STARTER)
 
     def test_create_session_missing_secret_key(self):
         """Test that missing Stripe secret key raises ValueError."""
         os.environ.pop("BEDROCK_STRIPE_SECRET_KEY", None)
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_test"
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_test"
 
         from bedrock.licensing.checkout import create_checkout_session
 
         with self.assertRaises(ValueError) as ctx:
-            create_checkout_session(tier=CheckoutTier.DEVELOPER_INDIVIDUAL)
+            create_checkout_session(tier=CheckoutTier.STARTER)
         self.assertIn("SECRET_KEY", str(ctx.exception))
 
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
 
     @patch("bedrock.licensing.checkout.stripe")
     def test_create_session_with_custom_urls(self, mock_stripe):
         """Test custom success/cancel URLs."""
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_test"
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_test"
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
 
         mock_session = MagicMock()
@@ -132,7 +146,7 @@ class TestCreateCheckoutSession(unittest.TestCase):
         from bedrock.licensing.checkout import create_checkout_session
 
         result = create_checkout_session(
-            tier=CheckoutTier.DEVELOPER_INDIVIDUAL,
+            tier=CheckoutTier.STARTER,
             success_url="https://example.com/success",
             cancel_url="https://example.com/cancel",
         )
@@ -141,13 +155,13 @@ class TestCreateCheckoutSession(unittest.TestCase):
         self.assertEqual(call_kwargs["success_url"], "https://example.com/success")
         self.assertEqual(call_kwargs["cancel_url"], "https://example.com/cancel")
 
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
 
     @patch("bedrock.licensing.checkout.stripe")
     def test_create_session_with_metadata(self, mock_stripe):
         """Test custom metadata is passed through."""
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_test"
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_test"
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
 
         mock_session = MagicMock()
@@ -158,22 +172,22 @@ class TestCreateCheckoutSession(unittest.TestCase):
         from bedrock.licensing.checkout import create_checkout_session
 
         result = create_checkout_session(
-            tier=CheckoutTier.DEVELOPER_INDIVIDUAL,
+            tier=CheckoutTier.STARTER,
             metadata={"ref": "landing_page"},
         )
 
         call_kwargs = mock_stripe.checkout.Session.create.call_args[1]
         self.assertEqual(call_kwargs["metadata"]["ref"], "landing_page")
-        self.assertEqual(call_kwargs["metadata"]["bedrock_tier"], "developer_individual")
+        self.assertEqual(call_kwargs["metadata"]["bedrock_tier"], "starter")
 
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
 
 
 class TestHandleCheckoutCompleted(unittest.TestCase):
     """Test webhook event processing for checkout completion."""
 
-    def _make_event(self, tier="developer_individual", email="dev@example.com"):
+    def _make_event(self, tier="starter", email="customer@example.com"):
         """Create a mock Stripe checkout.session.completed event."""
         return {
             "type": "checkout.session.completed",
@@ -191,45 +205,44 @@ class TestHandleCheckoutCompleted(unittest.TestCase):
             },
         }
 
-    def test_handle_individual_checkout(self):
-        """Test license key issued for individual developer checkout."""
+    def test_handle_starter_checkout(self):
+        """Test license key issued for Starter checkout."""
         from bedrock.licensing.checkout import handle_checkout_completed
 
-        event = self._make_event(tier="developer_individual", email="alice@example.com")
+        event = self._make_event(tier="starter", email="alice@example.com")
         delivery = handle_checkout_completed(event)
 
         self.assertIsInstance(delivery, LicenseDelivery)
-        self.assertEqual(delivery.tier, "developer")
+        self.assertEqual(delivery.tier, "starter")
         self.assertEqual(delivery.customer_email, "alice@example.com")
         self.assertEqual(delivery.issued_to, "alice@example.com")
-        self.assertEqual(delivery.max_nodes, 3)  # developer tier = 3 nodes
 
-        # Verify the license key is valid
+        # Verify the license key is valid and at Starter tier
         enforcer = LicenseEnforcer()
         license_obj = enforcer.validate_license(delivery.license_key)
         self.assertTrue(license_obj.is_valid)
-        self.assertEqual(license_obj.tier, LicenseTier.DEVELOPER)
+        self.assertEqual(license_obj.tier, LicenseTier.STARTER)
 
-    def test_handle_team_checkout(self):
-        """Test license key issued for team developer checkout."""
+    def test_handle_business_checkout(self):
+        """Test license key issued for Business checkout."""
         from bedrock.licensing.checkout import handle_checkout_completed
 
-        event = self._make_event(tier="developer_team", email="team@company.com")
+        event = self._make_event(tier="business", email="biz@company.com")
         delivery = handle_checkout_completed(event)
 
-        self.assertEqual(delivery.tier, "developer")
-        self.assertEqual(delivery.customer_email, "team@company.com")
+        self.assertEqual(delivery.tier, "business")
+        self.assertEqual(delivery.customer_email, "biz@company.com")
 
-        # Team license should have more dev seats
         enforcer = LicenseEnforcer()
         license_obj = enforcer.validate_license(delivery.license_key)
         self.assertTrue(license_obj.is_valid)
+        self.assertEqual(license_obj.tier, LicenseTier.BUSINESS)
 
     def test_handle_checkout_missing_email(self):
         """Test checkout with no email uses 'licensee' as fallback."""
         from bedrock.licensing.checkout import handle_checkout_completed
 
-        event = self._make_event(tier="developer_individual", email="")
+        event = self._make_event(tier="starter", email="")
         # Remove customer_details too
         event["data"]["object"]["customer_details"] = {}
 
@@ -256,13 +269,13 @@ class TestConfigureStripe(unittest.TestCase):
 
     def test_configure_stripe_with_key(self):
         """Test Stripe is configured with the secret key."""
-        os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_configure_123"
+        os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_tes..._123"
 
         from bedrock.licensing.checkout import configure_stripe
         import stripe as stripe_mod
 
         result = configure_stripe()
-        self.assertEqual(stripe_mod.api_key, "sk_test_configure_123")
+        self.assertEqual(stripe_mod.api_key, "sk_tes..._123")
 
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
 
@@ -311,47 +324,47 @@ class TestPricingLinks(unittest.TestCase):
 
     @patch("bedrock.licensing.checkout.stripe")
     def test_create_pricing_links(self, mock_stripe):
-        """Test generating pricing links for all tiers."""
+        """Test generating pricing links for Starter and Business."""
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_individual"
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_TEAM"] = "price_team"
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_starter"
+        os.environ["BEDROCK_STRIPE_PRICE_BUSINESS"] = "price_business"
 
         mock_session = MagicMock()
-        mock_session.url = "https://checkout.stripe.com/pay/individual"
+        mock_session.url = "https://checkout.stripe.com/pay/starter"
         mock_stripe.checkout.Session.create.return_value = mock_session
 
         from bedrock.licensing.checkout import create_pricing_links
 
         links = create_pricing_links()
 
-        self.assertIn("developer_individual", links)
-        self.assertIn("developer_team", links)
-        self.assertTrue(links["developer_individual"].startswith("https://"))
+        self.assertIn("starter", links)
+        self.assertIn("business", links)
+        self.assertTrue(links["starter"].startswith("https://"))
 
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_TEAM"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
+        del os.environ["BEDROCK_STRIPE_PRICE_BUSINESS"]
 
     @patch("bedrock.licensing.checkout.stripe")
     def test_create_pricing_links_partial_config(self, mock_stripe):
         """Test that only configured tiers get links."""
         os.environ["BEDROCK_STRIPE_SECRET_KEY"] = "sk_test_123"
-        os.environ.pop("BEDROCK_STRIPE_PRICE_DEV_TEAM", None)
-        os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"] = "price_individual"
+        os.environ.pop("BEDROCK_STRIPE_PRICE_BUSINESS", None)
+        os.environ["BEDROCK_STRIPE_PRICE_STARTER"] = "price_starter"
 
         mock_session = MagicMock()
-        mock_session.url = "https://checkout.stripe.com/pay/individual"
+        mock_session.url = "https://checkout.stripe.com/pay/starter"
         mock_stripe.checkout.Session.create.return_value = mock_session
 
         from bedrock.licensing.checkout import create_pricing_links
 
         links = create_pricing_links()
 
-        self.assertIn("developer_individual", links)
-        self.assertNotIn("developer_team", links)
+        self.assertIn("starter", links)
+        self.assertNotIn("business", links)
 
         del os.environ["BEDROCK_STRIPE_SECRET_KEY"]
-        del os.environ["BEDROCK_STRIPE_PRICE_DEV_INDIVIDUAL"]
+        del os.environ["BEDROCK_STRIPE_PRICE_STARTER"]
 
 
 if __name__ == "__main__":
