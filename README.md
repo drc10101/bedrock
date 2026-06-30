@@ -71,7 +71,7 @@ Bedrock v0.3 is an active development release. Core modules (crypto, identity, d
 
 ```bash
 # Install
-pip install bedrock-core
+pip install infill-bedrock
 
 # Initialize a project
 bedrock init ./my-project
