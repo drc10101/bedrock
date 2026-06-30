@@ -1,0 +1,22 @@
+@echo off
+title Bedrock — Security Framework
+echo.
+echo  ███████╗███████╗ ██████╗ ██████╗ ███╗   ███╗
+echo  ██╔════╝██╔════╝██╔════╝██╔══██╗████╗ ████║
+echo  ███████╗█████╗  ██║     ██████╔╝██╔████╔██║
+echo  ╚════██║██╔══╝  ██║     ██╔══██╗██║╚██╔╝██║
+echo  ███████║███████╗╚██████╗██║  ██║██║ ╚═╝ ██║
+echo  ╚══════╝╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝     ╚═╝
+echo.
+echo  Build your app. Inherit the security.
+echo.
+echo  Starting Bedrock server...
+echo.
+python -m bedrock serve %*
+if errorlevel 1 (
+    echo.
+    echo  Bedrock exited with an error.
+    echo  Make sure infill-bedrock is installed: pip install infill-bedrock
+    echo.
+    pause
+)

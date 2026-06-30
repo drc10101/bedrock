@@ -84,6 +84,22 @@ bedrock dev --licensee "your-email@example.com"
 bedrock serve
 ```
 
+All commands also work via `python -m bedrock` if PATH isn't set:
+
+```bash
+python -m bedrock serve        # works everywhere
+```
+
+### One-Click Install (Windows)
+
+Run the PowerShell installer for a desktop shortcut and Start Menu entry:
+
+```powershell
+irm https://infill.systems/install/bedrock.ps1 | iex
+```
+
+To uninstall: `.\install_bedrock.ps1 -Uninstall`
+
 ### From Source
 
 ```bash
