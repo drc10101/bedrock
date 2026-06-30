@@ -70,7 +70,7 @@ Bedrock v0.3 is an active development release. Core modules (crypto, identity, d
 ## Quick Start
 
 ```bash
-# Install
+# Install (requires Python 3.11+)
 pip install infill-bedrock
 
 # Initialize a project
