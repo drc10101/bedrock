@@ -5,6 +5,10 @@
 <h3 align="center">Build your app. Inherit the security.</h3>
 
 <p align="center">
+  <a href="https://pypi.org/project/infill-bedrock/"><img src="https://img.shields.io/pypi/v/infill-bedrock?color=%2312c7ef&label=pypi%3A%20infill-bedrock" alt="PyPI"></a>
+</p>
+
+<p align="center">
   Bedrock is the security layer your app sits on top of.<br>
   Identity, encryption, consent, and audit — handled from the start.
 </p>
