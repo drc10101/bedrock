@@ -1,5 +1,5 @@
 {
-  "name": "bedrock-sdk",
+  "name": "@drc10101_bedrock_sdk/bedrock-sdk",
   "version": "0.3.2",
   "description": "Bedrock SDK — Identity-based security framework for TypeScript/JavaScript. Every node is a user. Everything between is encrypted at rest.",
   "main": "dist/index.js",
@@ -38,6 +38,9 @@
   },
   "homepage": "https://github.com/drc10101/bedrock#readme",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
