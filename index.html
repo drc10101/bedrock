@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bedrock — Identity-based security framework</title>
+  <meta name="description" content="Every node is a user. Everything between is encrypted at rest. Bedrock provides the foundational security layer for applications that handle sensitive data.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://buildonbedrock.dev/">
+  <meta property="og:title" content="Bedrock — Identity-based security framework">
+  <meta property="og:description" content="Every node is a user. Everything between is encrypted. Cryptographic identity, field-level encryption, consent-gated access, tamper-evident audit.">
+  <meta property="og:url" content="https://buildonbedrock.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://buildonbedrock.dev/assets/Bedrock_Logo.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <style>
+    :root {
+      --teal: #12c7ef;
+      --teal-dark: #0ea8cc;
+      --teal-glow: rgba(18, 199, 239, 0.15);
+      --bg: #0a0a0f;
+      --bg-card: #12121a;
+      --bg-card-hover: #1a1a25;
+      --text: #e8e8ef;
+      --text-dim: #8888a0;
+      --text-bright: #ffffff;
+      --border: #2a2a3a;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { color: var(--teal-dark); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Header */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 16px 0;
+      position: sticky;
+      top: 0;
+      background: rgba(10, 10, 15, 0.92);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+    header .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-bright);
+    }
+    .logo img { height: 32px; }
+    nav { display: flex; gap: 28px; font-size: 14px; }
+    nav a { color: var(--text-dim); transition: color 0.15s; }
+    nav a:hover { color: var(--teal); }
+    .nav-cta {
+      background: var(--teal);
+      color: var(--bg) !important;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .nav-cta:hover { background: var(--teal-dark); }
+
+    /* Hero */
+    .hero {
+      padding: 100px 0 80px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      color: var(--text-bright);
+      margin-bottom: 20px;
+    }
+    .hero h1 span { color: var(--teal); }
+    .hero p {
+      font-size: 20px;
+      color: var(--text-dim);
+      max-width: 640px;
+      margin: 0 auto 40px;
+    }
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.15s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary { background: var(--teal); color: var(--bg); }
+    .btn-primary:hover { background: var(--teal-dark); transform: translateY(-1px); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--teal); color: var(--teal); }
+
+    .hero-badges {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 32px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .badge strong { color: var(--text-bright); }
+
+    /* Sections */
+    section { padding: 80px 0; }
+    section h2 {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+    }
+    section .subtitle {
+      color: var(--text-dim);
+      font-size: 18px;
+      margin-bottom: 48px;
+      max-width: 600px;
+    }
+    section .subtitle.center { margin-left: auto; margin-right: auto; text-align: center; }
+
+    /* Principles */
+    .principles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 24px;
+    }
+    .principle {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+      transition: border-color 0.15s;
+    }
+    .principle:hover { border-color: var(--teal); }
+    .principle h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 8px;
+    }
+    .principle p { font-size: 14px; color: var(--text-dim); }
+    .principle-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--teal-glow);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 18px;
+    }
+
+    /* Code block */
+    .code-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      font-family: var(--mono);
+      font-size: 14px;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: var(--text-dim);
+      margin: 32px 0;
+    }
+    .code-block .prompt { color: var(--teal); }
+    .code-block .output { color: var(--text-dim); }
+    .code-block .string { color: #a5d6a7; }
+    .code-block .comment { color: #5a5a70; }
+
+    /* Pricing */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 768px) {
+      .pricing-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 36px; }
+      nav { gap: 16px; }
+    }
+    .pricing-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px 28px;
+      position: relative;
+      transition: border-color 0.15s;
+    }
+    .pricing-card:hover { border-color: var(--teal); }
+    .pricing-card.featured {
+      border-color: var(--teal);
+      background: linear-gradient(180deg, var(--teal-glow) 0%, var(--bg-card) 40%);
+    }
+    .pricing-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-bottom: 4px;
+    }
+    .pricing-card .price {
+      font-size: 40px;
+      font-weight: 800;
+      color: var(--teal);
+      margin: 16px 0 4px;
+    }
+    .pricing-card .price .period { font-size: 16px; font-weight: 400; color: var(--text-dim); }
+    .pricing-card .desc { color: var(--text-dim); font-size: 14px; margin-bottom: 20px; }
+    .pricing-card ul {
+      list-style: none;
+      padding: 0;
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+    .pricing-card ul li {
+      padding: 6px 0;
+      border-top: 1px solid var(--border);
+    }
+    .pricing-card ul li::before { content: ""; }
+    .pricing-card .featured-badge {
+      position: absolute;
+      top: -1px;
+      right: 20px;
+      background: var(--teal);
+      color: var(--bg);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 0 0 6px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Architecture */
+    .arch-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.4;
+      color: var(--text-dim);
+      overflow-x: auto;
+      white-space: pre;
+    }
+    .arch-diagram .layer-label { color: var(--teal); font-weight: 700; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 0;
+      margin-top: 40px;
+    }
+    footer .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    footer .copyright { font-size: 13px; color: var(--text-dim); }
+    footer .links { display: flex; gap: 24px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="container">
+      <a href="/" class="logo">
+        <img src="assets/Bedrock_Logo.png" alt="Bedrock" height="28">
+      </a>
+      <nav>
+        <a href="agents.html">For Agents</a>
+        <a href="#principles">Principles</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://github.com/drc10101/bedrock" target="_blank">GitHub</a>
+        <a href="#quickstart" class="nav-cta">Start Free</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Every node is a user.<br><span>Everything between is encrypted.</span></h1>
+      <p>Bedrock is the foundational security layer for applications that handle sensitive data. Identity at every endpoint. Encryption at rest. Consent-gated access. Audit everything.</p>
+      <div class="hero-buttons">
+        <a href="#quickstart" class="btn btn-primary">Start Free</a>
+        <a href="https://github.com/drc10101/bedrock" target="_blank" class="btn btn-secondary">View on GitHub</a>
+      </div>
+      <div class="hero-badges">
+        <div class="badge"><strong>930</strong> tests passing</div>
+        <div class="badge"><strong>Python 3.11+</strong></div>
+        <div class="badge"><strong>TypeScript</strong> SDK</div>
+        <div class="badge"><strong>BSL-1.1</strong> license</div>
+        <div class="badge"><strong>Free</strong> for developers</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="principles">
+    <div class="container">
+      <h2>Core Principles</h2>
+      <p class="subtitle">Five pillars that make Bedrock different from every other security framework.</p>
+      <div class="principles">
+        <div class="principle">
+          <div class="principle-icon">&#x1F511;</div>
+          <h3>Identity-First</h3>
+          <p>Every compute endpoint has a cryptographic identity. No anonymous access. No implicit trust.</p>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">&#x1F512;</div>
+          <h3>Encrypted at Rest</h3>
+          <p>Data exists in cleartext only at the consuming endpoint, only for the minimum time required. Everything else is encrypted.</p>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">&#x1F91D;</div>
+          <h3>Consent-Gated</h3>
+          <p>No cross-silo data access without cryptographic proof of consent. Patients own their data. Systems enforce it.</p>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">&#x1F4CB;</div>
+          <h3>Audit Everything</h3>
+          <p>SHA-256 hash chain. Tamper-evident. Tamper-resistant. Every access, every consent grant, every key rotation.</p>
+        </div>
+        <div class="principle">
+          <div class="principle-icon">&#x1F3E0;</div>
+          <h3>Self-Hosted</h3>
+          <p>No Bedrock-operated infrastructure. Your data stays in your environment. Your keys never leave your network.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickstart" style="background: linear-gradient(180deg, transparent, var(--teal-glow), transparent);">
+    <div class="container">
+      <h2>Quick Start</h2>
+      <p class="subtitle center">Up and running in 60 seconds. Free for development. No credit card required.</p>
+
+      <div class="code-block">
+<span class="prompt">$</span> pip install bedrock-core
+<span class="prompt">$</span> bedrock init ./my-project
+<span class="output">Initialized Bedrock project in ./my-project</span>
+
+<span class="prompt">$</span> bedrock dev --licensee <span class="string">"you@example.com"</span>
+<span class="output">License generated (DEVELOPER, perpetual)
+  Key: 1:DEVELOPER:you@example.com:20260627:...
+  Save to /etc/bedrock/license.key or set BEDROCK_LICENSE_KEY</span>
+
+<span class="prompt">$</span> bedrock serve
+<span class="output">Bedrock API running on https://localhost:8443</span></div>
+
+      <div style="text-align: center; margin-top: 24px;">
+        <a href="https://github.com/drc10101/bedrock" class="btn btn-secondary">Read the Docs</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="container">
+      <h2>Architecture</h2>
+      <p class="subtitle">Layered security from the mesh up.</p>
+      <div class="arch-diagram"><span class="layer-label">Application Layer</span>
+  Python SDK  |  TypeScript SDK  |  CLI  |  REST API (FastAPI)
+
+<span class="layer-label">Bedrock Core</span>
+  Encryption Engine  |  Identity Fabric  |  Data Silos
+  Access Control     |  Audit Chain     |  Licensing
+
+<span class="layer-label">Key Management (HKDF)</span>
+  Per-silo derivation  |  Key rotation  |  HSM support
+
+<span class="layer-label">Mesh Transport</span>
+  Self-healing  |  mTLS  |  Node discovery  |  State machine</div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="container">
+      <h2>Pricing</h2>
+      <p class="subtitle center">Free for development. Pay when you ship to production.</p>
+
+      <div class="pricing-grid">
+        <div class="pricing-card featured">
+          <div class="featured-badge">Start Here</div>
+          <h3>Developer</h3>
+          <div class="price">Free<span class="period"> / forever</span></div>
+          <div class="desc">Build locally. Ship when ready. No credit card.</div>
+          <ul>
+            <li>3 local nodes</li>
+            <li>Self-signed certificates</li>
+            <li>All APIs and SDKs</li>
+            <li>Audit chain and consent</li>
+            <li>Community support</li>
+          </ul>
+        </div>
+
+        <div class="pricing-card">
+          <h3>Starter</h3>
+          <div class="price">$5K<span class="period"> / year</span></div>
+          <div class="desc">Production deployment. CA-enforced certificates.</div>
+          <ul>
+            <li>5 nodes</li>
+            <li>CA-enforced certificates</li>
+            <li>All APIs and SDKs</li>
+            <li>Email support</li>
+          </ul>
+        </div>
+
+        <div class="pricing-card">
+          <h3>Business</h3>
+          <div class="price">$20K<span class="period"> / year</span></div>
+          <div class="desc">Production at scale. 25 nodes.</div>
+          <ul>
+            <li>25 nodes</li>
+            <li>CA-enforced certificates</li>
+            <li>All APIs and SDKs</li>
+            <li>Priority support</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 32px; color: var(--text-dim); font-size: 14px;">
+        <p>Need unlimited nodes or air-gapped deployment? <a href="mailto:ops@infill.systems" style="color: var(--teal);">Enterprise (custom pricing)</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="sdks">
+    <div class="container">
+      <h2>SDKs</h2>
+      <p class="subtitle">First-class support for Python and TypeScript.</p>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px;">
+        <div>
+          <h3 style="font-size: 16px; color: var(--text-bright); margin-bottom: 12px;">Python</h3>
+          <div class="code-block" style="margin: 0;">
+<span class="keyword" style="color: #c792ea;">from</span> bedrock <span class="keyword" style="color: #c792ea;">import</span> BedrockClient
+
+client = BedrockClient(
+    base_url=<span class="string">"https://bedrock.example.com"</span>,
+    license_key=<span class="string">"1:..."</span>,
+)
+
+node = client.nodes.register(
+    name=<span class="string">"my-service"</span>
+)
+silo = client.silos.create(
+    name=<span class="string">"patient-records"</span>,
+    categories=[<span class="string">"medical"</span>, <span class="string">"phi"</span>],
+)</div>
+        </div>
+
+        <div>
+          <h3 style="font-size: 16px; color: var(--text-bright); margin-bottom: 12px;">TypeScript</h3>
+          <div class="code-block" style="margin: 0;">
+<span class="keyword" style="color: #c792ea;">import</span> { BedrockClient } <span class="keyword" style="color: #c792ea;">from</span>
+  <span class="string">"@infill/bedrock-sdk"</span>;
+
+<span class="keyword" style="color: #c792ea;">const</span> client = <span class="keyword" style="color: #c792ea;">new</span> BedrockClient({
+  baseUrl: <span class="string">"https://bedrock.example.com"</span>,
+  licenseKey: <span class="string">"1:..."</span>,
+});
+
+<span class="keyword" style="color: #c792ea;">const</span> node = <span class="keyword" style="color: #c792ea;">await</span> client.nodes
+  .register({ name: <span class="string">"my-service"</span> });</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="copyright">
+        &copy; 2026 InFill Systems, LLC. All rights reserved.<br>
+        <span style="font-size: 12px;">BSL-1.1 license. Free for development. Production use requires a paid license.</span>
+      </div>
+      <div class="links">
+        <a href="https://github.com/drc10101/bedrock">GitHub</a>
+        <a href="SECURITY.md">Security</a>
+        <a href="LICENSE">License</a>
+        <a href="mailto:ops@infill.systems">Contact</a>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
