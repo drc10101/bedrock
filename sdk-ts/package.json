@@ -1,5 +1,5 @@
 {
-  "name": "@infill/bedrock-sdk",
+  "name": "bedrock-sdk",
   "version": "0.3.0",
   "description": "Bedrock SDK — Identity-based security framework for TypeScript/JavaScript. Every node is a user. Everything between is encrypted at rest.",
   "main": "dist/index.js",
